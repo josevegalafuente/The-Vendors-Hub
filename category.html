@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Vendors Hub | Vendors</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="manager-dashboard.html">
+      <span class="brand-mark">VH</span>
+      <span>The Vendors Hub</span>
+    </a>
+    <nav class="header-actions" aria-label="Category navigation">
+      <a class="header-link" href="manager-dashboard.html">All markets</a>
+      <button id="logoutButton" class="ghost-button" type="button">Log out</button>
+    </nav>
+  </header>
+
+  <main class="page-shell">
+    <div class="breadcrumb-row">
+      <a id="backToMarket" class="back-link" href="manager-dashboard.html">← Back to market</a>
+      <a class="back-link" href="manager-dashboard.html">Back to all markets</a>
+    </div>
+
+    <section class="page-hero category-hero">
+      <div>
+        <p class="eyebrow">Vendor category</p>
+        <h1 id="categoryTitle">Service category</h1>
+        <p id="categorySubtitle">Registered vendors appear here.</p>
+      </div>
+    </section>
+
+    <section id="vendorList" class="vendor-list"></section>
+  </main>
+
+  <footer class="site-footer">
+    <p>The Vendors Hub · Vendor listings</p>
+  </footer>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/category.js"></script>
+</body>
+</html>

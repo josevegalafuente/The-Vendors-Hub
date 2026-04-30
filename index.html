@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Vendors Hub | Login</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body class="auth-page">
+  <header class="site-header auth-header">
+    <a class="brand" href="index.html" aria-label="The Vendors Hub home">
+      <span class="brand-mark">VH</span>
+      <span>The Vendors Hub</span>
+    </a>
+    <a id="continueLink" class="header-link" href="#" hidden>Continue to dashboard</a>
+  </header>
+
+  <main class="auth-layout">
+    <section class="auth-hero">
+      <p class="eyebrow">Vendor visibility for property teams</p>
+      <h1>One hub for registered vendors, service markets, and property manager discovery.</h1>
+      <p>
+        The Vendors Hub helps vendors build a searchable service profile while giving property managers a clean way to browse by state, category, and coverage area.
+      </p>
+      <div class="hero-stat-row">
+        <article>
+          <strong>50</strong>
+          <span>U.S. markets</span>
+        </article>
+        <article>
+          <strong>40+</strong>
+          <span>Vendor categories</span>
+        </article>
+        <article>
+          <strong>0</strong>
+          <span>Fake listings</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="auth-card" aria-labelledby="formTitle">
+      <div class="role-switch" aria-label="Choose account type">
+        <button type="button" class="is-active" data-role-button="vendor">I am a Vendor</button>
+        <button type="button" data-role-button="manager">I am a Property Manager</button>
+      </div>
+
+      <div class="mode-switch" aria-label="Choose login or register">
+        <button type="button" class="is-active" data-mode-button="register">Register</button>
+        <button type="button" data-mode-button="login">Log in</button>
+      </div>
+
+      <div class="form-heading">
+        <p id="roleHelp" class="eyebrow">Vendors can register their business, services, and coverage areas.</p>
+        <h2 id="formTitle">Create your Vendor account</h2>
+        <p id="formSubtitle">Build your service profile, define your coverage areas, and become searchable by market.</p>
+      </div>
+
+      <form id="authForm" class="stacked-form" autocomplete="on">
+        <div id="vendorFields" class="form-panel soft-panel">
+          <label>
+            Business name
+            <input type="text" name="businessName" placeholder="Example: Blue Ridge Plumbing Co.">
+          </label>
+          <label>
+            Main contact name
+            <input type="text" name="contactName" placeholder="Example: Alex Morgan">
+          </label>
+          <label>
+            Phone number
+            <input type="tel" name="phone" placeholder="Example: (555) 018-4422">
+          </label>
+        </div>
+
+        <label>
+          Email address
+          <input type="email" name="email" placeholder="you@example.com" required>
+        </label>
+        <label>
+          Password
+          <input type="password" name="password" placeholder="Minimum 6 characters" required>
+        </label>
+        <label id="passwordConfirmGroup">
+          Confirm password
+          <input type="password" name="confirmPassword" placeholder="Re-enter your password">
+        </label>
+
+        <p id="authMessage" class="form-message" aria-live="polite"></p>
+        <button id="submitButton" class="primary-button full" type="submit">Create account</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© <span id="year"></span> The Vendors Hub. Built as a functional front-end prototype.</p>
+  </footer>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

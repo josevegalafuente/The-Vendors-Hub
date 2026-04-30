@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Vendors Hub | Market</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="manager-dashboard.html">
+      <span class="brand-mark">VH</span>
+      <span>The Vendors Hub</span>
+    </a>
+    <nav class="header-actions" aria-label="Market navigation">
+      <a class="header-link" href="manager-dashboard.html">All markets</a>
+      <button id="logoutButton" class="ghost-button" type="button">Log out</button>
+    </nav>
+  </header>
+
+  <main class="page-shell">
+    <a class="back-link" href="manager-dashboard.html">← Back to all markets</a>
+    <section class="page-hero market-detail-hero">
+      <div>
+        <p class="eyebrow">Market overview</p>
+        <h1 id="marketTitle">Market</h1>
+        <p id="marketSubtitle">Choose a service category.</p>
+        <div id="marketStats" class="market-stats"></div>
+      </div>
+    </section>
+
+    <div id="categoryGrid" class="category-grid"></div>
+  </main>
+
+  <footer class="site-footer">
+    <p>The Vendors Hub · Market categories</p>
+  </footer>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/market.js"></script>
+</body>
+</html>

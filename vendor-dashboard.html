@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Vendors Hub | Vendor Dashboard</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="vendor-dashboard.html">
+      <span class="brand-mark">VH</span>
+      <span>The Vendors Hub</span>
+    </a>
+    <nav class="header-actions" aria-label="Vendor dashboard navigation">
+      <span id="completionStatus" class="status-badge warning">Profile is not live yet</span>
+      <button id="logoutButton" class="ghost-button" type="button">Log out</button>
+    </nav>
+  </header>
+
+  <main class="page-shell">
+    <section class="page-hero vendor-hero">
+      <div>
+        <p class="eyebrow">Vendor dashboard</p>
+        <h1>Create and manage your public vendor profile.</h1>
+        <p>Property Managers will only see your profile when your contact information, services, and coverage areas are saved.</p>
+      </div>
+    </section>
+
+    <form id="vendorProfileForm" class="dashboard-grid">
+      <aside class="profile-sidebar content-card">
+        <div id="photoPreview" class="photo-preview">Photo</div>
+        <label class="file-button">
+          Upload profile photo
+          <input id="profilePhoto" type="file" accept="image/*">
+        </label>
+        <p class="helper-text">Use a logo, storefront, crew image, or professional profile photo.</p>
+      </aside>
+
+      <section class="content-card profile-form-card">
+        <div class="section-heading compact-heading">
+          <p class="eyebrow">Business profile</p>
+          <h2>Company and contact details</h2>
+        </div>
+        <div class="form-grid two-columns">
+          <label>
+            Business name
+            <input type="text" name="businessName" required>
+          </label>
+          <label>
+            Main contact name
+            <input type="text" name="contactName">
+          </label>
+          <label>
+            Email address
+            <input type="email" name="email" required>
+          </label>
+          <label>
+            Phone number
+            <input type="tel" name="phone" required>
+          </label>
+          <label>
+            Website
+            <input type="url" name="website" placeholder="https://example.com">
+          </label>
+          <label>
+            Street address
+            <input type="text" name="address">
+          </label>
+          <label>
+            City
+            <input type="text" name="city">
+          </label>
+          <label>
+            State
+            <select id="state" name="state"></select>
+          </label>
+          <label>
+            ZIP code
+            <input type="text" name="zip">
+          </label>
+          <label class="span-two">
+            About your company
+            <textarea name="about" rows="5" placeholder="Briefly describe your company, specialties, response time, certifications, and ideal property work."></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="content-card span-main">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Services</p>
+            <h2>Select every service your company provides</h2>
+            <p>These selections control where your profile appears for Property Managers.</p>
+          </div>
+        </div>
+        <div id="serviceGrid" class="service-grid"></div>
+      </section>
+
+      <section class="content-card span-main">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Coverage map</p>
+            <h2>Define states, counties, and cities you cover</h2>
+            <p>Select a state from the map or dropdown, then add counties and cities. You can remove and re-add areas any time.</p>
+          </div>
+        </div>
+
+        <div id="stateMap" class="state-map" aria-label="State selector map"></div>
+
+        <div class="coverage-builder soft-panel">
+          <label>
+            State
+            <select id="coverageState"></select>
+          </label>
+          <label>
+            County
+            <input id="coverageCounty" type="text" placeholder="Example: Montgomery County">
+          </label>
+          <label class="span-two">
+            Cities inside this county
+            <input id="coverageCities" type="text" placeholder="Example: Rockville, Bethesda, Silver Spring">
+          </label>
+          <button id="addCoverageButton" class="secondary-button" type="button">Add coverage area</button>
+        </div>
+
+        <div id="coverageList" class="coverage-list"></div>
+      </section>
+
+      <section class="save-bar span-main">
+        <p id="saveMessage" class="form-message" aria-live="polite"></p>
+        <button class="primary-button" type="submit">Save vendor profile</button>
+      </section>
+    </form>
+  </main>
+
+  <footer class="site-footer">
+    <p>The Vendors Hub · Vendor profile management</p>
+  </footer>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/vendor-dashboard.js"></script>
+</body>
+</html>
