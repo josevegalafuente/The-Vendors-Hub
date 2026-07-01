@@ -144,6 +144,100 @@
     }
   });
 
+  // ───────────────────────────────────────────────────────────────
+  // SIGN IN WITH GOOGLE
+  // ───────────────────────────────────────────────────────────────
+
+  // Decodifica el "id_token" (JWT) que manda Google para leer el correo y el nombre.
+  // No verificamos la firma aquí (eso se hace en el backend en producción); para el
+  // prototipo confiamos en que el token viene directo de la librería de Google.
+  function decodeJwt(token){
+    try{
+      const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const json = decodeURIComponent(
+        atob(base64).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
+      );
+      return JSON.parse(json);
+    }catch(e){
+      console.error("No se pudo leer el token de Google", e);
+      return null;
+    }
+  }
+
+  // Se ejecuta cuando el usuario elige una cuenta en el popup de Google.
+  function handleGoogleCredential(response){
+    clearAlert();
+    const payload = decodeJwt(response && response.credential);
+    if(!payload || !payload.email){
+      showAlert("We couldn't read your Google account. Please try again.");
+      return;
+    }
+
+    const result = Auth.signInWithGoogle({ email: payload.email, name: payload.name, role });
+
+    // Cuenta nueva pero sin rol elegido: llevamos al usuario a "Create account"
+    // para que elija Vendor o Property Manager y vuelva a pulsar el botón.
+    if(!result.ok && result.needsRole){
+      if(mode !== "register") setMode("register");
+      showAlert(result.error, "error");
+      return;
+    }
+    if(!result.ok){
+      showAlert(result.error);
+      return;
+    }
+
+    const msg = result.created
+      ? "Account created with Google! Welcome to The Vendors Hub."
+      : `Welcome back, ${result.user.email}`;
+    UI.showToast(msg, "success");
+    setTimeout(() => {
+      window.location.href = result.user.role === "vendor" ? "vendor-dashboard.html" : "markets.html";
+    }, 600);
+  }
+
+  // Arranca la librería de Google y dibuja el botón oficial. Como el script de
+  // Google se carga con "async", puede que aún no esté listo: reintentamos un poco.
+  function initGoogle(attempt){
+    attempt = attempt || 0;
+    const clientId = (window.APP_CONFIG && window.APP_CONFIG.GOOGLE_CLIENT_ID) || "";
+    const configured = clientId && clientId.indexOf("PASTE_") === -1;
+    const section = document.getElementById("googleSection");
+    if(!section) return;
+
+    // Sin Client ID configurado → dejamos el botón oculto y seguimos con correo/contraseña.
+    if(!configured){
+      section.style.display = "none";
+      return;
+    }
+
+    // ¿Ya cargó la librería de Google?
+    if(!(window.google && google.accounts && google.accounts.id)){
+      if(attempt < 40){ setTimeout(() => initGoogle(attempt + 1), 150); }
+      return;
+    }
+
+    google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleGoogleCredential
+    });
+
+    const btnHost = document.getElementById("googleBtn");
+    btnHost.innerHTML = "";
+    google.accounts.id.renderButton(btnHost, {
+      theme: "outline",
+      size: "large",
+      text: "continue_with",
+      shape: "rectangular",
+      logo_alignment: "center",
+      width: 320
+    });
+
+    section.style.display = "block";
+  }
+
+  initGoogle();
+
   // Initialize from URL params
   setMode(mode);
   if(role) setRole(role);
