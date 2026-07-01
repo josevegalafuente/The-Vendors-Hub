@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign In · VendorHub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="site-header"></header>
+
+<main>
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="auth-hero auth-hero--image-auth">
+        <div>
+          <span class="badge" id="heroBadge">Account access</span>
+          <h1 id="heroTitle">Welcome <em>back.</em></h1>
+          <p id="heroDesc">Sign in to access your VendorHub account or create a new one to get started.</p>
+        </div>
+        <div class="stamp">Established 2025</div>
+      </div>
+
+      <div class="auth-form">
+        <div class="auth-tabs" id="modeTabs">
+          <button data-mode="signin">Sign in</button>
+          <button data-mode="register">Create account</button>
+        </div>
+
+        <h2 id="formTitle">Sign in to your account</h2>
+        <p class="lede" id="formLede">Enter your credentials to continue.</p>
+
+        <div id="alertContainer"></div>
+
+        <!-- Role selector — visible in register mode -->
+        <div id="roleSection">
+          <label style="display:block; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); font-weight:600; margin-bottom:12px;">I am a...</label>
+          <div class="role-grid" style="margin-bottom:24px">
+            <button type="button" class="role-card vendor" data-role="vendor">
+              <div class="icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <div class="meta">
+                <strong>Vendor</strong>
+                <span>Service provider</span>
+              </div>
+              <div class="arrow">→</div>
+            </button>
+            <button type="button" class="role-card pm" data-role="pm">
+              <div class="icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              </div>
+              <div class="meta">
+                <strong>Property Manager</strong>
+                <span>Looking for vendors</span>
+              </div>
+              <div class="arrow">→</div>
+            </button>
+          </div>
+        </div>
+
+        <form id="authForm" autocomplete="on">
+          <div class="field-group">
+            <label for="emailInput">Email address</label>
+            <input class="field-input" id="emailInput" type="email" placeholder="you@company.com" required />
+            <small id="emailHint" style="display:none; margin-top:6px; color:var(--cerulean); font-size:12px;"></small>
+          </div>
+          <div class="field-group">
+            <label for="passwordInput">Password</label>
+            <input class="field-input" id="passwordInput" type="password" placeholder="At least 6 characters" required minlength="6" />
+          </div>
+          <div class="field-group" id="confirmPasswordGroup" style="display:none">
+            <label for="confirmInput">Confirm password</label>
+            <input class="field-input" id="confirmInput" type="password" placeholder="Re-enter your password" />
+          </div>
+
+          <button type="submit" class="btn btn-dark btn-block" id="submitBtn">Sign in</button>
+        </form>
+
+        <div class="auth-foot" id="authFootText"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer"></footer>
+
+<script src="data/locations.js"></script>
+<script src="data/services.js"></script>
+<script src="data/vendors-data.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/page-auth.js"></script>
+</body>
+</html>

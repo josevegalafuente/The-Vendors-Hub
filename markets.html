@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Markets · VendorHub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="site-header"></header>
+
+<main>
+  <div class="container">
+
+    <div class="markets-hero">
+      <div class="markets-hero-text">
+        <div class="eyebrow">Property Manager</div>
+        <h1>Find vendors in <em>your markets.</em></h1>
+        <p class="lede">Verified vendors across every U.S. market.</p>
+        <div class="hero-stats">
+          <div class="hero-stat"><strong id="statVendors">0</strong><span>Vendors</span></div>
+          <div class="hero-stat"><strong id="statCategories">0</strong><span>Categories</span></div>
+          <div class="hero-stat"><strong>50</strong><span>States</span></div>
+          <div class="hero-stat"><strong id="statAvgRating">N/A</strong><span>Avg. rating</span></div>
+        </div>
+      </div>
+      <div class="markets-hero-art">
+        <img id="heroIllustration" alt="Vendors and property managers" />
+      </div>
+    </div>
+
+    <div class="markets-controls">
+      <div class="search-box wide">
+        <input id="stateSearch" type="text" placeholder="Search a state, service or city (e.g. Florida, plumbing, Ocala)…" />
+      </div>
+      <div class="region-filter" id="regionFilter">
+        <button class="active" data-region="all">All</button>
+        <button data-region="Northeast">Northeast</button>
+        <button data-region="South">South</button>
+        <button data-region="Midwest">Midwest</button>
+        <button data-region="West">West</button>
+      </div>
+    </div>
+
+    <div id="searchResults"></div>
+    <div class="states-grid" id="statesGrid"></div>
+
+  </div>
+</main>
+
+<footer class="site-footer"></footer>
+
+<script src="data/locations.js"></script>
+<script src="data/services.js"></script>
+<script src="data/vendors-data.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/page-markets.js"></script>
+</body>
+</html>

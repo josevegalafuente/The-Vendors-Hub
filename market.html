@@ -1,43 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Vendors Hub | Market</title>
-  <link rel="stylesheet" href="assets/css/styles.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Market · VendorHub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <header class="site-header">
-    <a class="brand" href="manager-dashboard.html">
-      <span class="brand-mark">VH</span>
-      <span>The Vendors Hub</span>
-    </a>
-    <nav class="header-actions" aria-label="Market navigation">
-      <a class="header-link" href="manager-dashboard.html">All markets</a>
-      <button id="logoutButton" class="ghost-button" type="button">Log out</button>
-    </nav>
-  </header>
 
-  <main class="page-shell">
-    <a class="back-link" href="manager-dashboard.html">← Back to all markets</a>
-    <section class="page-hero market-detail-hero">
-      <div>
-        <p class="eyebrow">Market overview</p>
-        <h1 id="marketTitle">Market</h1>
-        <p id="marketSubtitle">Choose a service category.</p>
-        <div id="marketStats" class="market-stats"></div>
+<header class="site-header"></header>
+
+<main>
+  <div class="container">
+
+    <div class="back-row">
+      <a class="back-link" href="markets.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <span>Back to all markets</span>
+      </a>
+    </div>
+
+    <div class="market-header">
+      <div class="market-header-text">
+        <div class="eyebrow" id="regionBadge">Region</div>
+        <h1 id="stateTitle"><em>State market.</em></h1>
+        <p id="stateDesc"></p>
+        <div class="meta-row">
+          <div class="meta-item"><strong id="metaVendors">0</strong> vendors</div>
+          <div class="meta-item"><strong id="metaCounties">0</strong> counties</div>
+          <div class="meta-item"><strong id="metaCategories">0</strong> active categories</div>
+        </div>
       </div>
-    </section>
+      <div class="market-header-art">
+        <img id="marketIllustration" alt="Vendors and property managers" />
+      </div>
+    </div>
 
-    <div id="categoryGrid" class="category-grid"></div>
-  </main>
+    <div class="section-head">
+      <h2>Service categories</h2>
+      <p class="lede" id="catLede">Choose a category to see the vendors available in this market.</p>
+    </div>
 
-  <footer class="site-footer">
-    <p>The Vendors Hub · Market categories</p>
-  </footer>
+    <div class="categories-grid" id="categoriesGrid"></div>
 
-  <script src="assets/js/data.js"></script>
-  <script src="assets/js/storage.js"></script>
-  <script src="assets/js/market.js"></script>
+  </div>
+</main>
+
+<footer class="site-footer"></footer>
+
+<script src="data/locations.js"></script>
+<script src="data/services.js"></script>
+<script src="data/vendors-data.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/page-market.js"></script>
 </body>
 </html>

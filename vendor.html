@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vendor · VendorHub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="site-header"></header>
+
+<main>
+  <div class="container">
+
+    <div class="back-row">
+      <a class="back-link" id="backLink" href="markets.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <span id="backLinkText">Back</span>
+      </a>
+    </div>
+
+    <div id="ownerStatus"></div>
+
+    <!-- HERO -->
+    <div class="vendor-hero">
+      <div class="hero-avatar" id="heroAvatar"></div>
+      <div class="hero-info">
+        <h1 id="vendorName"></h1>
+        <div class="vp-rating-line" id="ratingLine"></div>
+        <div class="vendor-meta" id="vendorMeta"></div>
+      </div>
+      <div class="hero-actions" id="heroActions"></div>
+    </div>
+
+    <!-- BODY -->
+    <div class="vendor-detail-grid">
+
+      <!-- MAIN -->
+      <div class="vendor-detail-main">
+
+        <div class="panel vp-section">
+          <h3>About</h3>
+          <div id="aboutBlock"></div>
+        </div>
+
+        <div class="panel vp-section">
+          <h3>Services offered</h3>
+          <div class="services-flat" id="servicesBlock"></div>
+        </div>
+
+        <div class="panel vp-section">
+          <h3>Coverage areas</h3>
+          <div class="coverage-summary" id="coverageBlock"></div>
+        </div>
+
+        <!-- REVIEWS + RATING -->
+        <div class="panel reviews-panel">
+          <h3>Ratings &amp; reviews</h3>
+          <div class="reviews-summary" id="reviewsSummary"></div>
+
+          <!-- Rating form (only for Property Managers) -->
+          <div id="rateBox"></div>
+
+          <div id="reviewsList"></div>
+        </div>
+
+      </div>
+
+      <!-- SIDE -->
+      <div class="vendor-detail-side">
+        <div class="panel contact-card">
+          <div class="panel-head"><h3>Contact</h3></div>
+          <div id="contactBlock"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>Licenses</h3></div>
+          <div id="licenseBlock"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</main>
+
+<footer class="site-footer"></footer>
+
+<script src="data/locations.js"></script>
+<script src="data/services.js"></script>
+<script src="data/vendors-data.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/page-vendor.js"></script>
+</body>
+</html>
