@@ -1,102 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Vendors Hub | Login</title>
-  <link rel="stylesheet" href="assets/css/styles.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Vendors Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
 </head>
-<body class="auth-page">
-  <header class="site-header auth-header">
-    <a class="brand" href="index.html" aria-label="The Vendors Hub home">
-      <span class="brand-mark">VH</span>
-      <span>The Vendors Hub</span>
-    </a>
-    <a id="continueLink" class="header-link" href="#" hidden>Continue to dashboard</a>
-  </header>
+<body>
 
-  <main class="auth-layout">
-    <section class="auth-hero">
-      <p class="eyebrow">Vendor visibility for property teams</p>
-      <h1>One hub for registered vendors, service markets, and property manager discovery.</h1>
-      <p>
-        The Vendors Hub helps vendors build a searchable service profile while giving property managers a clean way to browse by state, category, and coverage area.
-      </p>
-      <div class="hero-stat-row">
-        <article>
-          <strong>50</strong>
-          <span>U.S. markets</span>
-        </article>
-        <article>
-          <strong>40+</strong>
-          <span>Vendor categories</span>
-        </article>
-        <article>
-          <strong>0</strong>
-          <span>Fake listings</span>
-        </article>
-      </div>
-    </section>
+<header class="site-header"></header>
 
-    <section class="auth-card" aria-labelledby="formTitle">
-      <div class="role-switch" aria-label="Choose account type">
-        <button type="button" class="is-active" data-role-button="vendor">I am a Vendor</button>
-        <button type="button" data-role-button="manager">I am a Property Manager</button>
-      </div>
+<main class="lp">
 
-      <div class="mode-switch" aria-label="Choose login or register">
-        <button type="button" class="is-active" data-mode-button="register">Register</button>
-        <button type="button" data-mode-button="login">Log in</button>
-      </div>
-
-      <div class="form-heading">
-        <p id="roleHelp" class="eyebrow">Vendors can register their business, services, and coverage areas.</p>
-        <h2 id="formTitle">Create your Vendor account</h2>
-        <p id="formSubtitle">Build your service profile, define your coverage areas, and become searchable by market.</p>
-      </div>
-
-      <form id="authForm" class="stacked-form" autocomplete="on">
-        <div id="vendorFields" class="form-panel soft-panel">
-          <label>
-            Business name
-            <input type="text" name="businessName" placeholder="Example: Blue Ridge Plumbing Co.">
-          </label>
-          <label>
-            Main contact name
-            <input type="text" name="contactName" placeholder="Example: Alex Morgan">
-          </label>
-          <label>
-            Phone number
-            <input type="tel" name="phone" placeholder="Example: (555) 018-4422">
-          </label>
+  <!-- HERO -->
+  <section class="lp-hero">
+    <div class="lp-hero-inner">
+      <div class="lp-hero-text">
+        <span class="lp-eyebrow">B2B Marketplace</span>
+        <h1 class="lp-h1">Every service,<br><em>in its place.</em></h1>
+        <p class="lp-sub">The professional network connecting property managers with verified vendors across every U.S. market.</p>
+        <div class="lp-cta">
+          <a class="btn btn-primary btn-lg" href="auth.html?mode=register">Get started free</a>
+          <a class="btn btn-ghost btn-lg" href="auth.html">Sign in</a>
         </div>
+        <div class="lp-trust">Trusted across <strong>26 markets</strong> · <strong>1,000+</strong> verified vendors</div>
+      </div>
+      <div class="lp-hero-art">
+        <img src="assets/contractor.png" alt="Verified contractor reviewing plans" />
+      </div>
+    </div>
+  </section>
 
-        <label>
-          Email address
-          <input type="email" name="email" placeholder="you@example.com" required>
-        </label>
-        <label>
-          Password
-          <input type="password" name="password" placeholder="Minimum 6 characters" required>
-        </label>
-        <label id="passwordConfirmGroup">
-          Confirm password
-          <input type="password" name="confirmPassword" placeholder="Re-enter your password">
-        </label>
+  <!-- ROLE SELECTION -->
+  <section class="lp-section">
+    <div class="lp-section-head">
+      <h2>How would you like to get started?</h2>
+      <p class="lp-sub">Pick your role and create your account in under a minute. Free, no credit card.</p>
+    </div>
+    <div class="lp-role-grid">
+      <a class="lp-role-card" href="auth.html?role=vendor&mode=register">
+        <div class="lp-role-art art-lime"><img src="assets/handyman.png" alt="Vendor" /></div>
+        <div class="lp-role-body">
+          <h3>I'm a Vendor</h3>
+          <p>Register your business, list your services and coverage areas, and get found by property managers.</p>
+          <span class="lp-link">Get started →</span>
+        </div>
+      </a>
+      <a class="lp-role-card" href="auth.html?role=pm&mode=register">
+        <div class="lp-role-art art-blue"><img src="assets/pm-woman.png" alt="Property manager" /></div>
+        <div class="lp-role-body">
+          <h3>I'm a Property Manager</h3>
+          <p>Search verified vendors by service and location, and rate their work across your markets.</p>
+          <span class="lp-link">Get started →</span>
+        </div>
+      </a>
+    </div>
+  </section>
 
-        <p id="authMessage" class="form-message" aria-live="polite"></p>
-        <button id="submitButton" class="primary-button full" type="submit">Create account</button>
-      </form>
-    </section>
-  </main>
+  <!-- FEATURES -->
+  <section class="lp-section lp-features">
+    <div class="lp-section-head">
+      <h2>Everything in one place</h2>
+      <p class="lp-sub">A directory built for property management teams.</p>
+    </div>
+    <div class="lp-feature-grid">
+      <div class="lp-feature">
+        <div class="lp-feat-ic">🔍</div>
+        <h4>Search by service &amp; city</h4>
+        <p>Find the right vendor by category or exact location, instantly.</p>
+      </div>
+      <div class="lp-feature">
+        <div class="lp-feat-ic">⭐</div>
+        <h4>Ratings you can trust</h4>
+        <p>Property managers rate vendors, so the best ones rise to the top.</p>
+      </div>
+      <div class="lp-feature">
+        <div class="lp-feat-ic">🗺️</div>
+        <h4>Nationwide coverage</h4>
+        <p>Vendors across every U.S. state, organized by market and county.</p>
+      </div>
+    </div>
+  </section>
 
-  <footer class="site-footer">
-    <p>© <span id="year"></span> The Vendors Hub. Built as a functional front-end prototype.</p>
-  </footer>
+  <!-- CTA STRIP -->
+  <section class="lp-cta-strip">
+    <div class="lp-cta-strip-inner">
+      <div>
+        <h2>Ready to get started?</h2>
+        <p>Join the network today — it only takes a minute.</p>
+      </div>
+      <a class="btn btn-primary btn-lg" href="auth.html?mode=register">Create your free account</a>
+    </div>
+  </section>
 
-  <script src="assets/js/data.js"></script>
-  <script src="assets/js/storage.js"></script>
-  <script src="assets/js/auth.js"></script>
-  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</main>
+
+<footer class="site-footer"></footer>
+
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/ui.js"></script>
+<script>
+  // If already signed in, redirect to the appropriate dashboard
+  (function(){
+    const user = Storage.getCurrentUser();
+    if(user){
+      window.location.href = user.role === "vendor" ? "vendor-dashboard.html" : "markets.html";
+      return;
+    }
+    UI.mountChrome([], true);
+  })();
+</script>
 </body>
 </html>
