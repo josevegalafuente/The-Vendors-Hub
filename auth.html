@@ -81,6 +81,12 @@
           <button type="submit" class="btn btn-dark btn-block" id="submitBtn">Sign in</button>
         </form>
 
+        <!-- Separador + botón de Google. Se oculta solo si no hay Client ID. -->
+        <div id="googleSection" style="display:none">
+          <div class="auth-divider"><span>or</span></div>
+          <div id="googleBtn" class="google-btn-wrap"></div>
+        </div>
+
         <div class="auth-foot" id="authFootText"></div>
       </div>
     </div>
@@ -89,6 +95,10 @@
 
 <footer class="site-footer"></footer>
 
+<!-- Librería oficial de Google Identity Services (el botón "Sign in with Google") -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<script src="js/config.js"></script>
 <script src="data/locations.js"></script>
 <script src="data/services.js"></script>
 <script src="data/vendors-data.js"></script>

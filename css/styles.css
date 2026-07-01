@@ -557,6 +557,30 @@ h3{ font-size: 24px; line-height: 1.2; }
   cursor: pointer;
 }
 
+/* Separador "or" entre el formulario y el botón de Google */
+.auth-divider{
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.auth-divider::before,
+.auth-divider::after{
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+/* Contenedor del botón oficial de Google (se centra el botón que Google dibuja) */
+.google-btn-wrap{
+  display: flex;
+  justify-content: center;
+}
+
 /* =========================================================
    VENDOR PROFILE / DASHBOARD
    ========================================================= */
