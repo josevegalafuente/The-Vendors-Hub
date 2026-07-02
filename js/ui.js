@@ -86,7 +86,7 @@ window.UI = (function () {
         ${homeLink}
         <span class="user-pill">
           <span class="avatar">${escapeHtml(initials(name, 2))}</span>
-          ${escapeHtml(name)}
+          <span class="pill-name">${escapeHtml(name)}</span>
         </span>
         <button class="header-btn" data-action="logout">Sign out</button>
       `;

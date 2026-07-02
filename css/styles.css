@@ -131,12 +131,17 @@ em{ font-style: normal; }
 }
 .user-pill .avatar{
   width: 28px; height: 28px;
+  flex: none;
   border-radius: 50%;
   background: var(--keylime);
   color: var(--denim);
   font-weight: 700;
   font-size: 12px;
   display: flex; align-items: center; justify-content: center;
+}
+.user-pill .pill-name{
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .header-btn{
@@ -1453,13 +1458,54 @@ h3{ font-size: 24px; line-height: 1.2; }
   .auth-hero h1{ font-size: 32px; }
 }
 @media (max-width: 600px){
-  h1{ font-size: 32px; }
+  h1{ font-size: 30px; }
   h2{ font-size: 24px; }
   .container{ padding: 24px 16px; }
   .panel{ padding: 22px; }
-  .footer-inner{ grid-template-columns: 1fr; }
+  .footer-inner{ grid-template-columns: 1fr; gap: 28px; }
   .us-map-grid{ grid-template-columns: repeat(8, 1fr); }
-  .header-inner{ padding: 14px 20px; }
+
+  /* --- Header compacto: evita que se amontone/desborde --- */
+  .header-inner{ padding: 12px 16px; gap: 12px; flex-wrap: wrap; }
+  .logo{ font-size: 19px; }
+  .header-nav{ gap: 6px; }
+  .header-btn{ padding: 8px 12px; font-size: 12px; }
+  .user-pill{ padding: 5px 5px 5px 10px; font-size: 12px; max-width: 42vw; }
+
+  /* --- Encabezados de página apilados (título + acciones) --- */
+  .page-head{ flex-direction: column; align-items: stretch; gap: 16px; }
+  .page-head .actions{ flex-direction: column; }
+  .page-head .actions .btn{ width: 100%; justify-content: center; }
+
+  /* --- Controles de mercados: búsqueda a lo ancho, filtros que envuelven --- */
+  .markets-controls{ gap: 12px; }
+  .search-box{ max-width: none; width: 100%; }
+  .region-filter{ flex-wrap: wrap; }
+
+  /* --- Heros y secciones con menos padding --- */
+  .markets-hero, .market-header{ padding: 24px 20px; }
+  .markets-hero-art img{ max-height: 200px; }
+  .market-header-art img{ max-height: 180px; }
+  .hero-stats{ gap: 18px; }
+  .lp-hero{ padding: 48px 20px 40px; }
+  .lp-section{ padding: 48px 20px; }
+  .lp-section-head h2{ font-size: 30px; }
+  .lp-features .lp-section-head{ padding: 0 20px; }
+  .lp-feature-grid{ padding: 0 20px; }
+  .lp-cta-strip{ padding: 8px 20px 56px; }
+  .lp-cta-strip-inner{ padding: 32px 26px; }
+  .lp-cta-strip-inner h2{ font-size: 24px; }
+
+  /* --- Footer inferior apilado y centrado --- */
+  .footer-bottom{ flex-direction: column; gap: 8px; text-align: center; }
+}
+
+@media (max-width: 400px){
+  .logo{ font-size: 17px; }
+  .header-btn{ padding: 7px 10px; }
+  /* En pantallas muy angostas dejamos solo el avatar (sin el nombre) */
+  .user-pill{ padding: 5px; max-width: none; }
+  .user-pill .pill-name{ display: none; }
 }
 
 /* =========================================================
