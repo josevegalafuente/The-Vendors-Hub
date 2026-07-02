@@ -2,11 +2,17 @@
    Auth page logic — sign in / register tabs, role selection, submit
    ========================================================================= */
 (function(){
-  // Already signed in? Bounce to dashboard.
+  // ¿Ya tiene sesión? Lo mandamos a su panel.
+  // Solo si el rol es VÁLIDO; si la sesión trae un rol corrupto, la limpiamos
+  // y dejamos que inicie sesión de nuevo (así no se genera un bucle con las
+  // páginas protegidas que rebotan a auth.html).
   const existing = Storage.getCurrentUser();
-  if(existing){
+  if(existing && (existing.role === "vendor" || existing.role === "pm")){
     window.location.href = existing.role === "vendor" ? "vendor-dashboard.html" : "markets.html";
     return;
+  }
+  if(existing){
+    Storage.clearSession();
   }
 
   UI.mountChrome([], false);
@@ -106,41 +112,47 @@
   });
 
   // Form submit
-  $("#authForm").addEventListener("submit", e => {
+  $("#authForm").addEventListener("submit", async e => {
     e.preventDefault();
     clearAlert();
     const email = $("#emailInput").value;
     const password = $("#passwordInput").value;
+    const submitBtn = $("#authForm").querySelector('button[type="submit"]');
+    if(submitBtn) submitBtn.disabled = true;   // evita doble envío mientras se procesa
 
-    if(mode === "register"){
-      const confirm = $("#confirmInput").value;
-      if(!role){
-        showAlert("Please select a role above (Vendor or Property Manager).");
-        return;
+    try{
+      if(mode === "register"){
+        const confirm = $("#confirmInput").value;
+        if(!role){
+          showAlert("Please select a role above (Vendor or Property Manager).");
+          return;
+        }
+        if(password !== confirm){
+          showAlert("Passwords do not match.");
+          return;
+        }
+        const result = await Auth.register({ email, password, role });
+        if(!result.ok){
+          showAlert(result.error);
+          return;
+        }
+        UI.showToast("Account created! Welcome to The Vendors Hub.", "success");
+        setTimeout(() => {
+          window.location.href = role === "vendor" ? "vendor-dashboard.html" : "markets.html";
+        }, 600);
+      } else {
+        const result = await Auth.login({ email, password });
+        if(!result.ok){
+          showAlert(result.error);
+          return;
+        }
+        UI.showToast(`Welcome back, ${result.user.email}`, "success");
+        setTimeout(() => {
+          window.location.href = result.user.role === "vendor" ? "vendor-dashboard.html" : "markets.html";
+        }, 500);
       }
-      if(password !== confirm){
-        showAlert("Passwords do not match.");
-        return;
-      }
-      const result = Auth.register({ email, password, role });
-      if(!result.ok){
-        showAlert(result.error);
-        return;
-      }
-      UI.showToast("Account created! Welcome to The Vendors Hub.", "success");
-      setTimeout(() => {
-        window.location.href = role === "vendor" ? "vendor-dashboard.html" : "markets.html";
-      }, 600);
-    } else {
-      const result = Auth.login({ email, password });
-      if(!result.ok){
-        showAlert(result.error);
-        return;
-      }
-      UI.showToast(`Welcome back, ${result.user.email}`, "success");
-      setTimeout(() => {
-        window.location.href = result.user.role === "vendor" ? "vendor-dashboard.html" : "markets.html";
-      }, 500);
+    } finally {
+      if(submitBtn) submitBtn.disabled = false;
     }
   });
 
