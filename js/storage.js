@@ -89,6 +89,25 @@ window.Storage = (function () {
     return getUserById(s.userId);   // devolvemos el usuario fresco y completo
   }
 
+  /* ---------- migración de roles heredados ----------
+     Versiones antiguas del sitio guardaban a los Property Managers con el
+     rol "manager". El código actual usa "pm". Si no se normaliza, la sesión
+     vieja no coincide con lo que piden las páginas y se produce un BUCLE de
+     redirección infinito (markets.html ⇄ auth.html). Aquí reescribimos esos
+     roles heredados a "pm", tanto en las cuentas como en la sesión activa. */
+  function migrateLegacyRoles() {
+    const legacy = { manager: "pm", property_manager: "pm", propertymanager: "pm", propertyManager: "pm" };
+    let changed = false;
+    const users = getUsers();
+    users.forEach(u => {
+      if (u && legacy[u.role]) { u.role = legacy[u.role]; changed = true; }
+    });
+    if (changed) saveUsers(users);
+
+    const s = read(KEYS.session, null);
+    if (s && legacy[s.role]) { s.role = legacy[s.role]; write(KEYS.session, s); }
+  }
+
   /* ---------- vendors (proveedores) ---------- */
   function getAllVendors() {
     return getUsers().filter(u => u.role === "vendor");
@@ -346,12 +365,14 @@ window.Storage = (function () {
   }
 
   // Sembramos en cuanto carga el script.
+  migrateLegacyRoles();   // normaliza roles viejos ("manager" → "pm") antes de nada
   seedIfEmpty();
   syncImportedVendors();
 
   /* ---------- lo que exponemos al resto de la app ---------- */
   return {
     // usuarios / auth
+    getUsers, saveUsers,
     findUserByEmail, getUserById, createUser, updateUser,
     setSession, clearSession, getCurrentUser,
     // vendors
