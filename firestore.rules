@@ -1,0 +1,144 @@
+rules_version = '2';
+
+/* =========================================================================
+   REGLAS DE SEGURIDAD DE FIRESTORE — The Vendors Hub
+   -------------------------------------------------------------------------
+   AQUÍ es donde la seguridad se vuelve REAL.
+
+   Todo lo que hace hoy el navegador (comprobar roles, impedir que alguien
+   edite el perfil de otro, ocultar los correos de los vendors) es una
+   sugerencia: el código se ejecuta en el equipo del visitante y se puede
+   modificar. Estas reglas, en cambio, las aplica Google en SU servidor
+   antes de tocar la base de datos. Nadie las puede saltar, ni con las
+   herramientas de desarrollo, ni llamando a la API directamente.
+
+   CÓMO SE PUBLICAN
+     npm install -g firebase-tools
+     firebase login
+     firebase deploy --only firestore:rules
+
+   MODELO DE DATOS
+     users/{uid}          → una cuenta. El id es el uid de Firebase Auth.
+     listings/{ref}       → ficha del directorio importado.
+     listings/{ref}/reviews/{pmUid}  → reseña (una por property manager).
+     claims/{claimId}     → solicitud de un vendor para reclamar una ficha.
+     audit/{logId}        → registro de acciones de administración.
+   ========================================================================= */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ─── Ayudantes ─────────────────────────────────────────────────── */
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // El correo verificado por Google/Firebase, no uno que envíe el cliente.
+    function verifiedEmail() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    /* El rol vive en un CUSTOM CLAIM del token, no en el documento del
+       usuario. Es importante: si el rol se leyera del documento, alguien
+       podría escribir "admin" en su propio documento y ascenderse solo.
+       Los claims solo se pueden establecer desde el servidor con el Admin
+       SDK (ver FIREBASE.md → "Nombrar un administrador"). */
+    function role() {
+      return signedIn() ? request.auth.token.role : null;
+    }
+
+    function isAdmin()  { return role() == 'admin'; }
+    function isVendor() { return role() == 'vendor'; }
+    function isPM()     { return role() == 'pm'; }
+
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // Campos que el propio usuario NUNCA puede cambiar por su cuenta.
+    function protectedFieldsUnchanged() {
+      return request.resource.data.diff(resource.data)
+               .affectedKeys()
+               .hasAny(['role', 'status', 'claimedRef', 'createdAt']) == false;
+    }
+
+    /* ─── users ─────────────────────────────────────────────────────── */
+    match /users/{uid} {
+      // Cada quien lee su propia cuenta; el admin lee todas.
+      allow get: if isSelf(uid) || isAdmin();
+      allow list: if isAdmin();
+
+      // Alta: solo tu propio documento, con rol no privilegiado.
+      allow create: if isSelf(uid)
+                    && verifiedEmail()
+                    && request.resource.data.role in ['vendor', 'pm']
+                    && request.resource.data.email == request.auth.token.email
+                    && request.resource.data.status == 'active';
+
+      // Edición: tu propio perfil, pero sin tocar rol ni estado.
+      allow update: if (isSelf(uid) && protectedFieldsUnchanged()) || isAdmin();
+
+      // Borrar cuentas es cosa del administrador.
+      allow delete: if isAdmin();
+    }
+
+    /* ─── listings (directorio) ─────────────────────────────────────── */
+    match /listings/{ref} {
+      /* ⚠️  CLAVE PARA LOS DATOS PERSONALES
+         Solo usuarios autenticados leen el directorio. Esto es lo que
+         resuelve de verdad el problema de los 1.179 correos de vendors
+         que hoy están en un archivo público: aquí ya no hay archivo que
+         descargar, y sin sesión no se sirve ni un byte. */
+      allow read: if signedIn();
+
+      // Solo el administrador crea o modifica fichas (importación, ocultar…).
+      allow create, update, delete: if isAdmin();
+
+      /* ─── reseñas ───
+         El id del documento es el uid del property manager: así la regla
+         "una reseña por PM y por vendor" la impone la base de datos, no
+         el código del navegador. */
+      match /reviews/{pmUid} {
+        allow read: if signedIn();
+        allow create, update: if isPM()
+                              && isSelf(pmUid)
+                              && request.resource.data.stars is int
+                              && request.resource.data.stars >= 1
+                              && request.resource.data.stars <= 5
+                              && request.resource.data.comment.size() <= 1000;
+        // Un PM puede retirar su reseña; el admin puede moderar.
+        allow delete: if isSelf(pmUid) || isAdmin();
+      }
+    }
+
+    /* ─── claims (reclamaciones de ficha) ───────────────────────────── */
+    match /claims/{claimId} {
+      // Ves tus propias solicitudes; el admin las ve todas.
+      allow get: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow list: if isAdmin();
+
+      // Un vendor crea su solicitud, siempre en estado "pending".
+      allow create: if isVendor()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.note.size() <= 500;
+
+      // SOLO el administrador aprueba o rechaza. Aquí está la garantía de
+      // que nadie puede apropiarse de la ficha de otro negocio.
+      allow update, delete: if isAdmin();
+    }
+
+    /* ─── audit (registro de acciones) ──────────────────────────────── */
+    match /audit/{logId} {
+      allow read: if isAdmin();
+      // Se escribe, nunca se modifica ni se borra: un registro que se puede
+      // editar no sirve como registro.
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    /* ─── Todo lo demás: denegado ───────────────────────────────────── */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

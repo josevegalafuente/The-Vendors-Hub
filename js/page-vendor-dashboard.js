@@ -1,9 +1,8 @@
 /* =========================================================================
-   Vendor Dashboard — profile editor with hierarchical coverage:
-   State → Counties → Cities
+   page-vendor-dashboard.js — editor del perfil del vendor, con cobertura
+   jerárquica: Estado → Condados → Ciudades.
    ========================================================================= */
 (function(){
-  // Auth guard
   const user = Auth.requireRole("vendor", "auth.html?role=vendor");
   if(!user) return;
 
@@ -12,35 +11,41 @@
     { label: "My profile" }
   ], true);
 
+  const CFG = window.APP_CONFIG || {};
+  const UP = CFG.UPLOADS || {};
+
   const $ = sel => document.querySelector(sel);
   const profile = user.profile || {};
 
-  // ─── Selection state (mutable) ───────────────────────
+  // ─── Estado editable ─────────────────────────────────
   let selectedServices = new Set(profile.services || []);
-  // coverage: { stateAbbr: { mode: 'full'|'partial', counties: { 'County': ['City1', ...] } } }
+  // coverage: { estado: { mode: 'full'|'partial', counties: { 'Condado': ['Ciudad', …] } } }
   let coverage = profile.coverage ? JSON.parse(JSON.stringify(profile.coverage)) : {};
   let avatar = profile.avatar || null;
-  // Licencias adjuntas: arreglo de { name, type, dataURL }
   let licenses = Array.isArray(profile.licenses) ? profile.licenses.slice() : [];
+  // Qué condados están desplegados. Antes se perdía en cada redibujado y era
+  // molestísimo al ir marcando ciudades una a una.
+  const expandedCounties = new Set();
 
-  // ─── Populate text fields ────────────────────────────
-  const FIELD_IDS = ["businessName","contactName","addressLine","city","state","zip","phone","website","about","yearsActive","employees","license"];
+  // ─── Campos de texto ─────────────────────────────────
+  const FIELD_IDS = ["businessName","contactName","addressLine","city","state","zip",
+                     "phone","website","about","yearsActive","employees","license"];
   FIELD_IDS.forEach(id => {
     const el = document.getElementById(id);
     if(el && profile[id] != null) el.value = profile[id];
   });
   $("#email").value = user.email;
 
-  // Enlace para ver el perfil público propio
   const viewBtn = document.getElementById("viewProfileBtn");
-  if(viewBtn) viewBtn.href = `vendor.html?id=${user.id}`;
+  if(viewBtn) viewBtn.href = `vendor.html?id=${encodeURIComponent(user.id)}`;
 
-  // ─── Estado del perfil: "Profile incomplete" / "Profile complete" ───
-  // Lee de un objeto de perfil "en vivo" (lo que hay en pantalla + selecciones),
-  // para que el aviso se actualice al guardar.
+  // ─── Estado del perfil ("incompleto" / "completo") ───
   function currentProfileSnapshot(){
     const snap = {};
-    FIELD_IDS.forEach(id => { snap[id] = (document.getElementById(id).value || "").trim(); });
+    FIELD_IDS.forEach(id => {
+      const el = document.getElementById(id);       // sin el guard, quitar un
+      snap[id] = el ? (el.value || "").trim() : ""; // campo del HTML rompía la página entera
+    });
     snap.services = Array.from(selectedServices);
     snap.coverage = coverage;
     return snap;
@@ -49,73 +54,141 @@
   function renderProfileStatus(){
     const box = document.getElementById("profileStatus");
     if(!box) return;
-    const status = Storage.getProfileCompleteness({ profile: currentProfileSnapshot() });
-    if(status.complete){
-      box.innerHTML = `
-        <div class="status-banner complete">
-          <span class="status-ico">✓</span>
-          <div><strong>Profile complete</strong> · your profile is ready for property managers to see.</div>
-        </div>`;
-    } else {
-      box.innerHTML = `
-        <div class="status-banner incomplete">
-          <span class="status-ico">!</span>
-          <div>
-            <strong>Profile incomplete</strong> · ${status.filled} of ${status.total} done.
-            Please add: ${status.missing.map(m => `<span class="miss-tag">${UI.escapeHtml(m)}</span>`).join(" ")}
-          </div>
-        </div>`;
-    }
+    const status = DB.getProfileCompleteness({ profile: currentProfileSnapshot() });
+    box.innerHTML = status.complete
+      ? `<div class="status-banner complete">
+           <span class="status-ico">✓</span>
+           <div><strong>Profile complete</strong> · your profile is ready for property managers to see.</div>
+         </div>`
+      : `<div class="status-banner incomplete">
+           <span class="status-ico">!</span>
+           <div>
+             <strong>Profile incomplete</strong> · ${status.filled} of ${status.total} done.
+             Please add: ${status.missing.map(m => `<span class="miss-tag">${UI.escapeHtml(m)}</span>`).join(" ")}
+           </div>
+         </div>`;
   }
   renderProfileStatus();
 
-  // ─── Avatar upload ───────────────────────────────────
+  /* ─── Estado de la reclamación de ficha ───────────────
+     Si el vendor todavía no está vinculado a una ficha del directorio, le
+     mostramos aquí en qué punto está su solicitud. */
+  function renderClaimStatus(){
+    const box = document.getElementById("claimStatus");
+    if(!box) return;
+
+    if(user.claimedRef){
+      const listing = DB.getListingByRef(user.claimedRef);
+      box.innerHTML = `<div class="status-banner complete">
+          <span class="status-ico">🏷️</span>
+          <div><strong>Directory listing linked</strong> · ${UI.escapeHtml(listing ? listing.name : user.claimedRef)}</div>
+        </div>`;
+      return;
+    }
+
+    const mine = DB.getClaims().filter(c => c.userId === user.id);
+    const pending = mine.find(c => c.status === "pending");
+    if(pending){
+      const listing = DB.getListingByRef(pending.ref);
+      box.innerHTML = `<div class="status-banner pending">
+          <span class="status-ico">⏳</span>
+          <div><strong>Claim under review</strong> · ${UI.escapeHtml(listing ? listing.name : pending.ref)}.
+               An administrator will approve or reject it shortly.</div>
+        </div>`;
+      return;
+    }
+    const rejected = mine.find(c => c.status === "rejected");
+    if(rejected){
+      box.innerHTML = `<div class="status-banner incomplete">
+          <span class="status-ico">!</span>
+          <div><strong>Claim rejected</strong> · contact the administrator if you think this was a mistake.</div>
+        </div>`;
+      return;
+    }
+    box.innerHTML = "";
+  }
+  renderClaimStatus();
+
+  /* =====================================================================
+     AVATAR
+     Las imágenes se COMPRIMEN antes de guardarse. Una foto de 4 MB ocupa
+     ~5,5 MB en base64 y agota ella sola toda la cuota del navegador.
+     ===================================================================== */
   function paintAvatar(){
     const slot = $("#avatarUpload");
-    if(avatar){
-      slot.innerHTML = `<img src="${avatar}" alt="Avatar"/><input type="file" id="avatarFile" hidden accept="image/*" />`;
-    } else {
-      slot.innerHTML = `
-        <div class="avatar-text">
-          <div class="camera-icon">📷</div>
-          Upload profile photo
-        </div>
-        <input type="file" id="avatarFile" hidden accept="image/*" />
-      `;
-    }
-    // Re-bind because we replaced innerHTML
-    $("#avatarUpload").addEventListener("click", openFile);
+    const safe = UI.safeImageSrc(avatar);
+    slot.innerHTML = safe
+      ? `<img src="${UI.escapeHtml(safe)}" alt="Profile photo"/>
+         <input type="file" id="avatarFile" hidden accept="image/*" />`
+      : `<div class="avatar-text">
+           <div class="camera-icon">📷</div>
+           Upload profile photo
+         </div>
+         <input type="file" id="avatarFile" hidden accept="image/*" />`;
+    // Re-enlazamos porque acabamos de reemplazar el innerHTML.
+    slot.addEventListener("click", openFile);
     document.getElementById("avatarFile").addEventListener("change", handleAvatarChange);
   }
+
   function openFile(){ document.getElementById("avatarFile").click(); }
-  function handleAvatarChange(e){
+
+  async function handleAvatarChange(e){
     const file = e.target.files[0];
     if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      avatar = ev.target.result;
+
+    const allowed = UP.ALLOWED_IMAGE_TYPES || ["image/jpeg","image/png","image/webp","image/gif"];
+    if(allowed.indexOf(file.type) === -1){
+      UI.showToast("Please choose a JPG, PNG, WebP or GIF image.", "error");
+      e.target.value = "";
+      return;
+    }
+    if(file.size > (UP.MAX_AVATAR_BYTES || 4 * 1024 * 1024)){
+      UI.showToast("That image is too large. Please use one under 4 MB.", "error");
+      e.target.value = "";
+      return;
+    }
+
+    try{
+      avatar = await UI.compressImage(file, UP.AVATAR_MAX_DIMENSION || 512, UP.AVATAR_QUALITY || 0.82);
       paintAvatar();
-    };
-    reader.readAsDataURL(file);
+      UI.showToast("Photo ready. Remember to save your profile.", "success");
+    }catch(err){
+      console.error(err);
+      UI.showToast("Could not read that image. Try another file.", "error");
+    }
+    e.target.value = "";
   }
   paintAvatar();
 
-  // ─── License documents (file attachments) ────────────
-  const MAX_LICENSE_BYTES = 2 * 1024 * 1024; // ~2 MB por archivo
+  /* =====================================================================
+     DOCUMENTOS DE LICENCIA
+     ===================================================================== */
+  const MAX_LICENSE_BYTES = UP.MAX_LICENSE_BYTES || 700 * 1024;
+  const MAX_LICENSE_FILES = UP.MAX_LICENSE_FILES || 5;
+  const ALLOWED_LICENSE_TYPES = UP.ALLOWED_LICENSE_TYPES ||
+    ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 
   function renderLicenses(){
     const list = $("#licensesList");
-    if(licenses.length === 0){
-      list.innerHTML = "";
-      return;
-    }
-    list.innerHTML = licenses.map((f, i) => `
-      <div class="file-chip">
-        <span class="file-ico">${f.type && f.type.indexOf("pdf") > -1 ? "📄" : "🖼️"}</span>
-        <a class="file-name" href="${f.dataURL}" target="_blank" rel="noopener" download="${UI.escapeHtml(f.name)}">${UI.escapeHtml(f.name)}</a>
-        <button type="button" class="file-remove" data-index="${i}" title="Remove">✕</button>
-      </div>
-    `).join("");
+    if(licenses.length === 0){ list.innerHTML = ""; return; }
+
+    list.innerHTML = licenses.map((f, i) => {
+      const src = UI.safeFileSrc(f.dataURL);
+      const isPdf = !!src && src.indexOf("data:application/pdf") === 0;
+      const nameHtml = UI.escapeHtml(f.name);
+      // Si el adjunto no supera la validación, se muestra sin enlace.
+      const label = src
+        ? `<a class="file-name" href="${UI.escapeHtml(src)}" target="_blank" rel="noopener noreferrer"
+              download="${nameHtml}">${nameHtml}</a>`
+        : `<span class="file-name">${nameHtml}</span>`;
+      return `
+        <div class="file-chip">
+          <span class="file-ico">${isPdf ? "📄" : "🖼️"}</span>
+          ${label}
+          <button type="button" class="file-remove" data-index="${i}" title="Remove" aria-label="Remove ${nameHtml}">✕</button>
+        </div>`;
+    }).join("");
+
     list.querySelectorAll(".file-remove").forEach(btn => {
       btn.addEventListener("click", () => {
         licenses.splice(Number(btn.dataset.index), 1);
@@ -125,29 +198,52 @@
   }
 
   $("#licenseDrop").addEventListener("click", () => $("#licenseFile").click());
-  $("#licenseFile").addEventListener("change", e => {
+
+  $("#licenseFile").addEventListener("change", async e => {
     const file = e.target.files[0];
     if(!file) return;
-    if(file.size > MAX_LICENSE_BYTES){
-      UI.showToast("That file is larger than 2 MB. Please use a smaller file.", "error");
-      e.target.value = "";
+    e.target.value = "";   // permite volver a subir el mismo archivo
+
+    if(licenses.length >= MAX_LICENSE_FILES){
+      UI.showToast(`You can attach up to ${MAX_LICENSE_FILES} documents.`, "error");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      licenses.push({ name: file.name, type: file.type, dataURL: ev.target.result });
+    if(ALLOWED_LICENSE_TYPES.indexOf(file.type) === -1){
+      UI.showToast("Only PDF, JPG, PNG or WebP files are allowed.", "error");
+      return;
+    }
+    if(file.size > MAX_LICENSE_BYTES){
+      const kb = Math.round(MAX_LICENSE_BYTES / 1024);
+      UI.showToast(`That file is larger than ${kb} KB. Please use a smaller file.`, "error");
+      return;
+    }
+
+    try{
+      let dataURL;
+      if(file.type === "application/pdf"){
+        dataURL = await UI.readFileAsDataURL(file);
+      } else {
+        // Las imágenes se comprimen: una foto del carnet no necesita 3 MB.
+        dataURL = await UI.compressImage(file, 1400, 0.8);
+      }
+      licenses.push({ name: file.name.slice(0, 120), type: file.type, dataURL, addedAt: Date.now() });
       renderLicenses();
-      e.target.value = ""; // permite volver a subir el mismo archivo si hace falta
-    };
-    reader.readAsDataURL(file);
+      UI.showToast("Document attached. Remember to save your profile.", "success");
+    }catch(err){
+      console.error(err);
+      UI.showToast("Could not read that file.", "error");
+    }
   });
   renderLicenses();
 
-  // ─── Services ────────────────────────────────────────
+  /* =====================================================================
+     SERVICIOS
+     ===================================================================== */
   function renderServices(filter = ""){
     const container = $("#servicesContainer");
     const lower = filter.trim().toLowerCase();
     container.innerHTML = "";
+
     Object.entries(SERVICE_CATEGORIES).forEach(([catName, services]) => {
       const filtered = services.filter(s => s.toLowerCase().includes(lower));
       if(filtered.length === 0) return;
@@ -158,27 +254,32 @@
         <div class="service-pills">
           ${filtered.map(s => `
             <button type="button" class="service-pill ${selectedServices.has(s) ? 'selected' : ''}"
+              aria-pressed="${selectedServices.has(s)}"
               data-service="${UI.escapeHtml(s)}">${UI.escapeHtml(s)}</button>
           `).join("")}
         </div>
       `;
       container.appendChild(div);
     });
+
     container.querySelectorAll(".service-pill").forEach(pill => {
       pill.addEventListener("click", () => {
         const s = pill.dataset.service;
         if(selectedServices.has(s)) selectedServices.delete(s);
         else selectedServices.add(s);
         pill.classList.toggle("selected");
+        pill.setAttribute("aria-pressed", String(selectedServices.has(s)));
         $("#serviceCount").textContent = `${selectedServices.size} selected`;
       });
     });
     $("#serviceCount").textContent = `${selectedServices.size} selected`;
   }
   renderServices();
-  $("#serviceSearch").addEventListener("input", e => renderServices(e.target.value));
+  $("#serviceSearch").addEventListener("input", UI.debounce(e => renderServices(e.target.value), 150));
 
-  // ─── Map: geographic 11-col grid ─────────────────────
+  /* =====================================================================
+     MAPA — rejilla geográfica de 11 columnas
+     ===================================================================== */
   const MAP_LAYOUT = [
     ["",  "",  "",  "",  "",  "",  "",  "",  "",  "",  "ME"],
     ["AK","",  "",  "",  "",  "",  "",  "",  "VT","NH",""],
@@ -198,38 +299,43 @@
       row.forEach(abbr => {
         const cell = document.createElement("div");
         cell.className = "state-cell";
-        if(!abbr){ cell.classList.add("empty"); }
-        else {
+        if(!abbr){
+          cell.classList.add("empty");
+          cell.setAttribute("aria-hidden", "true");
+        } else {
           cell.textContent = abbr;
           const c = coverage[abbr];
           if(c && c.mode === "full") cell.classList.add("selected");
           else if(c && c.mode === "partial") cell.classList.add("partial");
-          cell.title = (STATES_DATA[abbr] || {}).name || abbr;
+          const stateName = (STATES_DATA[abbr] || {}).name || abbr;
+          cell.title = stateName;
+          // Navegable por teclado (antes solo respondía al ratón).
+          cell.setAttribute("role", "button");
+          cell.setAttribute("tabindex", "0");
+          cell.setAttribute("aria-label", stateName);
+          cell.setAttribute("aria-pressed", String(!!c));
           cell.addEventListener("click", () => onStateClick(abbr));
+          cell.addEventListener("keydown", e => {
+            if(e.key === "Enter" || e.key === " "){ e.preventDefault(); onStateClick(abbr); }
+          });
         }
         grid.appendChild(cell);
       });
     });
   }
 
+  // Ciclo: sin cobertura → estado completo → por condados → sin cobertura
   function onStateClick(abbr){
     const c = coverage[abbr];
-    if(!c){
-      // No coverage → full
-      coverage[abbr] = { mode: "full", counties: {} };
-    } else if(c.mode === "full"){
-      // Full → partial (initialize empty counties)
-      coverage[abbr] = { mode: "partial", counties: {} };
-    } else {
-      // Partial → none (only if no counties selected, otherwise just go to full again? Let's clear)
-      delete coverage[abbr];
-    }
-    renderMap();
-    renderCoverageEditor();
-    updateAreaCount();
+    if(!c) coverage[abbr] = { mode: "full", counties: {} };
+    else if(c.mode === "full") coverage[abbr] = { mode: "partial", counties: c.counties || {} };
+    else delete coverage[abbr];
+    refreshCoverage();
   }
 
-  // ─── Coverage editor (counties + cities per state) ───
+  /* =====================================================================
+     EDITOR DE COBERTURA (condados + ciudades por estado)
+     ===================================================================== */
   function renderCoverageEditor(){
     const editor = $("#coverageEditor");
     const stateAbbrs = Object.keys(coverage);
@@ -237,8 +343,10 @@
       editor.innerHTML = `<div class="coverage-editor-empty">Click a state on the map above to start defining your coverage.</div>`;
       return;
     }
-    editor.innerHTML = stateAbbrs.map(abbr => renderStateBlock(abbr)).join("");
-    bindStateBlockEvents();
+    editor.innerHTML = stateAbbrs.map(renderStateBlock).join("");
+    editor.querySelectorAll("[data-action]").forEach(el => {
+      el.addEventListener("click", onCoverageAction);
+    });
   }
 
   function renderStateBlock(abbr){
@@ -247,40 +355,37 @@
     const isFull = c.mode === "full";
     const totalCounties = stateData ? Object.keys(stateData.counties).length : 0;
     const selectedCounties = Object.keys(c.counties || {}).length;
+    const stateName = stateData ? stateData.name : abbr;
 
-    let body = "";
+    let body;
     if(isFull){
-      body = `<div style="font-family:var(--serif); font-style:italic; color:var(--muted); padding:8px 0;">
-        Full state coverage · all counties and cities in ${UI.escapeHtml(stateData.name)} are included.
+      body = `<div class="coverage-note">
+        Full state coverage · all counties and cities in ${UI.escapeHtml(stateName)} are included.
       </div>`;
     } else {
-      // Partial — list every county with its cities
       const counties = stateData ? Object.entries(stateData.counties) : [];
-      if(counties.length === 0){
-        body = `<div style="color:var(--muted); font-style:italic; padding:8px 0;">No county data available for this state.</div>`;
-      } else {
-        body = `<div class="county-list">
-          ${counties.map(([countyName, cities]) => renderCountyRow(abbr, countyName, cities)).join("")}
-        </div>`;
-      }
+      body = counties.length === 0
+        ? `<div class="coverage-note">No county data available for this state.</div>`
+        : `<div class="county-list">
+             ${counties.map(([countyName, cities]) => renderCountyRow(abbr, countyName, cities)).join("")}
+           </div>`;
     }
 
     return `
-      <div class="state-coverage-block" data-state="${abbr}">
+      <div class="state-coverage-block" data-state="${UI.escapeHtml(abbr)}">
         <div class="state-coverage-head">
           <div class="state-name">
-            <strong>${abbr}</strong> · ${UI.escapeHtml(stateData ? stateData.name : abbr)}
+            <strong>${UI.escapeHtml(abbr)}</strong> · ${UI.escapeHtml(stateName)}
             ${isFull
-              ? `<span style="font-size:12px; color:var(--cerulean); font-weight:600; margin-left:10px;">Full coverage</span>`
-              : `<span style="font-size:12px; color:var(--muted); font-weight:600; margin-left:10px;">${selectedCounties} of ${totalCounties} counties</span>`
-            }
+              ? `<span class="coverage-chip full">Full coverage</span>`
+              : `<span class="coverage-chip">${selectedCounties} of ${totalCounties} counties</span>`}
           </div>
           <div class="actions">
             <div class="coverage-mode">
-              <button class="${isFull ? 'active' : ''}" data-action="mode-full" data-state="${abbr}">Full state</button>
-              <button class="${!isFull ? 'active' : ''}" data-action="mode-partial" data-state="${abbr}">Counties</button>
+              <button type="button" class="${isFull ? 'active' : ''}" data-action="mode-full" data-state="${UI.escapeHtml(abbr)}">Full state</button>
+              <button type="button" class="${!isFull ? 'active' : ''}" data-action="mode-partial" data-state="${UI.escapeHtml(abbr)}">Counties</button>
             </div>
-            <button class="btn btn-sm btn-danger" data-action="remove-state" data-state="${abbr}">Remove</button>
+            <button type="button" class="btn btn-sm btn-danger" data-action="remove-state" data-state="${UI.escapeHtml(abbr)}">Remove</button>
           </div>
         </div>
         ${body}
@@ -288,62 +393,75 @@
     `;
   }
 
+  function countyKey(stateAbbr, countyName){ return stateAbbr + "::" + countyName; }
+
   function renderCountyRow(stateAbbr, countyName, cities){
     const c = coverage[stateAbbr];
     const selected = (c.counties && c.counties[countyName]) || null;
-    // selected = null (not selected), or array of city names (subset). Empty array = full county.
+    // selected = null (no seleccionado) o arreglo de ciudades.
+    // Arreglo vacío = condado completo.
     const isCountyFull = selected !== null && selected.length === 0;
     const isCountyPartial = selected !== null && selected.length > 0;
     const isAnySelected = selected !== null;
 
     const checkboxClass = isCountyFull ? "checked" : (isCountyPartial ? "partial" : "");
+    // Recuerda si el usuario lo había desplegado a mano.
+    const isExpanded = expandedCounties.has(countyKey(stateAbbr, countyName)) || isAnySelected;
+    const collapsed = isExpanded ? "" : "collapsed";
 
-    const collapsed = !isAnySelected ? "collapsed" : "";
+    const sAttr = UI.escapeHtml(stateAbbr);
+    const cAttr = UI.escapeHtml(countyName);
 
     return `
-      <div class="county-row ${collapsed}" data-state="${stateAbbr}" data-county="${UI.escapeHtml(countyName)}">
+      <div class="county-row ${collapsed}" data-state="${sAttr}" data-county="${cAttr}">
         <div class="county-head">
-          <div class="county-checkbox ${checkboxClass}" data-action="toggle-county" data-state="${stateAbbr}" data-county="${UI.escapeHtml(countyName)}">
+          <div class="county-checkbox ${checkboxClass}" role="checkbox" tabindex="0"
+               aria-checked="${isCountyFull}" aria-label="${cAttr}"
+               data-action="toggle-county" data-state="${sAttr}" data-county="${cAttr}">
             ${isCountyFull ? "✓" : (isCountyPartial ? "•" : "")}
           </div>
-          <div class="county-name" data-action="expand" data-state="${stateAbbr}" data-county="${UI.escapeHtml(countyName)}">${UI.escapeHtml(countyName)}</div>
+          <div class="county-name" data-action="expand" data-state="${sAttr}" data-county="${cAttr}">${cAttr}</div>
           <div class="city-count">
             ${isCountyFull ? `All ${cities.length} cities` :
               isCountyPartial ? `${selected.length} of ${cities.length} cities` :
               `${cities.length} cities`}
           </div>
-          <span class="toggle-icon" data-action="expand" data-state="${stateAbbr}" data-county="${UI.escapeHtml(countyName)}">▾</span>
+          <span class="toggle-icon" data-action="expand" data-state="${sAttr}" data-county="${cAttr}">▾</span>
         </div>
         <div class="county-cities">
           ${cities.map(city => {
             const cityActive = isCountyFull || (isCountyPartial && selected.includes(city));
             return `<button type="button" class="city-pill ${cityActive ? 'selected' : ''}"
-              data-action="toggle-city" data-state="${stateAbbr}" data-county="${UI.escapeHtml(countyName)}" data-city="${UI.escapeHtml(city)}">${UI.escapeHtml(city)}</button>`;
+              aria-pressed="${cityActive}"
+              data-action="toggle-city" data-state="${sAttr}" data-county="${cAttr}"
+              data-city="${UI.escapeHtml(city)}">${UI.escapeHtml(city)}</button>`;
           }).join("")}
         </div>
       </div>
     `;
   }
 
-  function bindStateBlockEvents(){
-    $("#coverageEditor").querySelectorAll("[data-action]").forEach(el => {
-      el.addEventListener("click", onCoverageAction);
-    });
-  }
-
   function onCoverageAction(e){
     e.stopPropagation();
     const el = e.currentTarget;
-    const action = el.dataset.action;
-    const stateAbbr = el.dataset.state;
-    const countyName = el.dataset.county;
-    const cityName = el.dataset.city;
+    const { action, state: stateAbbr, county: countyName, city: cityName } = el.dataset;
+
+    if(action === "expand"){
+      // Solo abre/cierra: no hace falta redibujar nada.
+      const row = el.closest(".county-row");
+      if(row){
+        row.classList.toggle("collapsed");
+        const key = countyKey(stateAbbr, countyName);
+        if(row.classList.contains("collapsed")) expandedCounties.delete(key);
+        else expandedCounties.add(key);
+      }
+      return;
+    }
 
     if(action === "mode-full"){
       coverage[stateAbbr] = { mode: "full", counties: {} };
     }
     else if(action === "mode-partial"){
-      // Switch to partial; preserve existing counties
       const cur = coverage[stateAbbr];
       coverage[stateAbbr] = { mode: "partial", counties: (cur && cur.counties) || {} };
     }
@@ -353,54 +471,33 @@
     else if(action === "toggle-county"){
       const c = coverage[stateAbbr];
       if(!c.counties) c.counties = {};
-      if(c.counties[countyName] !== undefined){
-        // Currently selected (full or partial) → remove
-        delete c.counties[countyName];
-      } else {
-        // Not selected → add as full county (empty array means "all cities")
-        c.counties[countyName] = [];
-      }
-    }
-    else if(action === "expand"){
-      const row = el.closest(".county-row");
-      if(row) row.classList.toggle("collapsed");
-      return; // No re-render needed
+      if(c.counties[countyName] !== undefined) delete c.counties[countyName];
+      else c.counties[countyName] = [];        // arreglo vacío = todas las ciudades
+      expandedCounties.add(countyKey(stateAbbr, countyName));
     }
     else if(action === "toggle-city"){
       const c = coverage[stateAbbr];
       if(!c.counties) c.counties = {};
       const stateData = STATES_DATA[stateAbbr];
       const allCities = (stateData && stateData.counties && stateData.counties[countyName]) || [];
-
       let current = c.counties[countyName];
+
       if(current === undefined){
-        // County not yet selected — start with this city
-        c.counties[countyName] = [cityName];
+        c.counties[countyName] = [cityName];                       // aún sin condado → esta ciudad
       } else if(current.length === 0){
-        // Was full — convert to all-but-this
-        c.counties[countyName] = allCities.filter(ci => ci !== cityName);
+        c.counties[countyName] = allCities.filter(ci => ci !== cityName);  // estaba completo → todas menos esta
       } else {
-        // Partial — toggle this city
-        if(current.includes(cityName)){
-          current = current.filter(ci => ci !== cityName);
-        } else {
-          current.push(cityName);
-        }
-        if(current.length === 0){
-          // No cities left — remove county entirely
-          delete c.counties[countyName];
-        } else if(current.length === allCities.length){
-          // All cities selected — collapse to "full county"
-          c.counties[countyName] = [];
-        } else {
-          c.counties[countyName] = current;
-        }
+        current = current.includes(cityName)
+          ? current.filter(ci => ci !== cityName)
+          : current.concat([cityName]);
+        if(current.length === 0) delete c.counties[countyName];           // ninguna → fuera el condado
+        else if(current.length === allCities.length) c.counties[countyName] = [];  // todas → condado completo
+        else c.counties[countyName] = current;
       }
+      expandedCounties.add(countyKey(stateAbbr, countyName));
     }
 
-    renderMap();
-    renderCoverageEditor();
-    updateAreaCount();
+    refreshCoverage();
   }
 
   function updateAreaCount(){
@@ -412,42 +509,75 @@
     $("#areaCount").textContent = `${count} ${count === 1 ? "area" : "areas"}`;
   }
 
-  renderMap();
-  renderCoverageEditor();
-  updateAreaCount();
+  function refreshCoverage(){
+    renderMap();
+    renderCoverageEditor();
+    updateAreaCount();
+    renderProfileStatus();
+  }
+  refreshCoverage();
 
-  // ─── Save profile ────────────────────────────────────
+  /* =====================================================================
+     GUARDAR
+     ===================================================================== */
+  let saving = false;
+
   function saveProfile(){
+    if(saving) return;
+
     const updates = {};
     FIELD_IDS.forEach(id => {
-      updates[id] = (document.getElementById(id).value || "").trim();
+      const el = document.getElementById(id);
+      updates[id] = el ? (el.value || "").trim() : "";
     });
 
-    // Basic validation
     if(!updates.businessName){
       UI.showToast("Please enter your business name.", "error");
-      $("#businessName").focus();
+      const el = $("#businessName");
+      if(el) el.focus();
       return;
     }
 
-    const profilePatch = {
-      ...updates,
+    /* El sitio web se normaliza y se valida. Si alguien escribe
+       `javascript:alert(1)` no se guarda: no queremos que ese valor llegue
+       nunca a un href. Si escribe "midominio.com" le añadimos https://. */
+    if(updates.website){
+      const clean = Auth.sanitizeUrl(updates.website);
+      if(!clean){
+        UI.showToast("That website address is not valid. Use something like https://yourcompany.com", "error");
+        const el = $("#website");
+        if(el) el.focus();
+        return;
+      }
+      updates.website = clean;
+      const el = $("#website");
+      if(el) el.value = clean;
+    }
+
+    saving = true;
+    const profilePatch = Object.assign({}, updates, {
       avatar,
       licenses,
       services: Array.from(selectedServices),
       coverage
-    };
+    });
 
-    const ok = Storage.updateUser(user.id, { profile: profilePatch });
+    const ok = DB.updateUser(user.id, { profile: profilePatch });
+    saving = false;
+
     if(ok){
       UI.showToast("Profile saved! Showing your profile…", "success");
       renderProfileStatus();
-      // Redirige a la página del perfil completo (vista, no edición).
-      setTimeout(() => { window.location.href = `vendor.html?id=${user.id}`; }, 700);
+      setTimeout(() => {
+        window.location.href = `vendor.html?id=${encodeURIComponent(user.id)}`;
+      }, 700);
     } else {
-      // Causa típica: superaste el límite de almacenamiento del navegador
-      // (fotos/PDF muy grandes). En la Fase B (Firebase) esto desaparece.
-      UI.showToast("Could not save. Storage is full, try smaller files.", "error");
+      // Causa típica: se superó el límite de almacenamiento del navegador.
+      const usage = DB.getStorageUsage();
+      UI.showToast(
+        `Could not save — browser storage is ${usage.percent}% full. Remove a document or use smaller files.`,
+        "error"
+      );
     }
   }
 
@@ -455,4 +585,15 @@
   const saveBtn2 = document.getElementById("saveBtn2");
   if(saveBtn2) saveBtn2.addEventListener("click", saveProfile);
 
+  // Aviso al salir con cambios sin guardar.
+  let dirty = false;
+  document.addEventListener("input", () => { dirty = true; }, true);
+  document.addEventListener("click", e => {
+    if(e.target.closest("#saveBtn, #saveBtn2")) dirty = false;
+  }, true);
+  window.addEventListener("beforeunload", e => {
+    if(!dirty) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
 })();

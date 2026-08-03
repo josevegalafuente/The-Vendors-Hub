@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Admin · VendorHub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600&display=swap" rel="stylesheet">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="site-header"></header>
+
+<main>
+  <div class="container">
+
+    <div class="admin-head">
+      <div>
+        <div class="eyebrow">Administration</div>
+        <h1>Control <em>panel.</em></h1>
+        <p class="lede">Accounts, directory listings and claim requests for The Vendors Hub.</p>
+      </div>
+    </div>
+
+    <div id="storageWarning"></div>
+    <div class="admin-stats" id="adminStats"></div>
+
+    <div class="admin-tabs" role="tablist">
+      <button class="admin-tab active" role="tab" aria-selected="true" data-panel="claims">Claim requests</button>
+      <button class="admin-tab" role="tab" aria-selected="false" data-panel="users">Accounts</button>
+      <button class="admin-tab" role="tab" aria-selected="false" data-panel="listings">Directory</button>
+      <button class="admin-tab" role="tab" aria-selected="false" data-panel="data">Data &amp; backup</button>
+    </div>
+
+    <!-- CLAIM REQUESTS -->
+    <section class="admin-panel active" id="panel-claims" role="tabpanel">
+      <h2 class="admin-section-title">Claim requests</h2>
+      <p class="admin-section-lede">
+        When a registered vendor says a directory listing is their business, the request lands here.
+        Nothing is transferred until you approve it.
+      </p>
+      <div id="claimsList"></div>
+    </section>
+
+    <!-- ACCOUNTS -->
+    <section class="admin-panel" id="panel-users" role="tabpanel">
+      <h2 class="admin-section-title">Accounts <span class="count-chip" id="userCount">0</span></h2>
+      <p class="admin-section-lede">People who can sign in: vendors, property managers and administrators.</p>
+      <div class="search-box">
+        <input id="userSearch" type="text" placeholder="Search by email, business or company…" />
+      </div>
+      <div id="usersList"></div>
+    </section>
+
+    <!-- DIRECTORY -->
+    <section class="admin-panel" id="panel-listings" role="tabpanel">
+      <h2 class="admin-section-title">Directory listings <span class="count-chip" id="listingCount">0</span></h2>
+      <p class="admin-section-lede">
+        Imported vendor records. These are informational entries, not accounts — nobody can sign in with them.
+      </p>
+      <div class="search-box">
+        <input id="listingSearch" type="text" placeholder="Search by name, reference or state (e.g. FL)…" />
+      </div>
+      <div id="listingsList"></div>
+    </section>
+
+    <!-- DATA & BACKUP -->
+    <section class="admin-panel" id="panel-data" role="tabpanel">
+      <h2 class="admin-section-title">Data &amp; backup</h2>
+
+      <div class="admin-card">
+        <h3>Contact emails</h3>
+        <p id="contactsNote" class="admin-section-lede"></p>
+      </div>
+
+      <div class="admin-card">
+        <h3>Backup</h3>
+        <p class="admin-section-lede">
+          All data lives in this browser only. If you clear your browser profile without a backup,
+          it is gone for good. Export regularly.
+        </p>
+        <div class="admin-actions">
+          <button class="btn btn-primary" id="exportBtn" type="button">Export backup (.json)</button>
+          <button class="btn btn-secondary" id="importBtn" type="button">Restore backup…</button>
+          <input type="file" id="importFile" accept="application/json,.json" hidden />
+        </div>
+      </div>
+
+      <div class="admin-card danger">
+        <h3>Danger zone</h3>
+        <p class="admin-section-lede">
+          Erases every account, listing, review and claim stored in this browser, then reloads the demo data.
+        </p>
+        <button class="btn btn-danger" id="resetBtn" type="button">Reset all data</button>
+      </div>
+
+      <div class="admin-card">
+        <h3>Recent activity</h3>
+        <div id="auditList"></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer"></footer>
+
+<script src="js/config.js"></script>
+<script src="data/locations.js"></script>
+<script src="data/services.js"></script>
+<script src="data/vendors-data.js"></script>
+<script src="js/db.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/page-admin.js"></script>
+</body>
+</html>

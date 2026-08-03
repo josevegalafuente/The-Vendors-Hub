@@ -25,3 +25,12 @@ build/
 # Environment
 .env
 .env.local
+
+# Datos privados — NUNCA se suben ni se publican
+# Correos reales de los vendors importados (datos personales de terceros).
+data/vendors-contacts.local.js
+# Claves de servicio de Firebase (la config web SÍ es pública; estas NO).
+firebase-service-account*.json
+# Exportaciones de la hoja de cálculo original de vendors (llevan correos reales)
+*.xlsx
+vendors-export*.csv

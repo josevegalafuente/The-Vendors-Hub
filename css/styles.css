@@ -1975,3 +1975,189 @@ h3{ font-size: 24px; line-height: 1.2; }
   .lp-feature-grid{ grid-template-columns: 1fr; }
   .lp-cta-strip-inner{ flex-direction: column; text-align: center; }
 }
+
+/* =========================================================
+   PANEL DE ADMINISTRACIÓN, RECLAMACIONES Y ACCESIBILIDAD
+   Añadido junto con el endurecimiento de seguridad.
+   ========================================================= */
+
+/* ---- Cabecera del panel ---- */
+.admin-head{ padding: 40px 0 24px; }
+.admin-head h1{ font-size: 40px; font-weight: 800; letter-spacing: -.02em; }
+.admin-head h1 em{ font-style: italic; color: var(--cerulean); }
+
+/* ---- Tarjetas de resumen ---- */
+.admin-stats{
+  display: grid; gap: 16px; margin-bottom: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.admin-stat{
+  background: var(--white); border: 1px solid var(--line);
+  border-radius: 14px; padding: 20px; box-shadow: var(--shadow-sm);
+}
+.admin-stat.alert{ border-color: #e08c20; background: #fdf7ef; }
+.admin-stat-value{ font-size: 30px; font-weight: 800; color: var(--ink); line-height: 1.1; }
+.admin-stat-label{
+  font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; margin-top: 6px;
+}
+.admin-stat-sub{ font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+/* ---- Pestañas ---- */
+.admin-tabs{
+  display: flex; gap: 4px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--line); margin-bottom: 28px;
+}
+.admin-tab{
+  background: none; border: none; cursor: pointer;
+  padding: 12px 18px; font-family: var(--sans); font-size: 14px; font-weight: 600;
+  color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.admin-tab:hover{ color: var(--ink); }
+.admin-tab.active{ color: var(--cerulean); border-bottom-color: var(--cerulean); }
+.admin-panel{ display: none; padding-bottom: 60px; }
+.admin-panel.active{ display: block; }
+
+.admin-section-title{ font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+.admin-section-lede{ color: var(--muted); font-size: 14px; margin-bottom: 20px; max-width: 70ch; }
+.count-chip{
+  display: inline-block; background: var(--eggshell); color: var(--muted);
+  border-radius: 999px; padding: 2px 11px; font-size: 13px; font-weight: 700; margin-left: 6px;
+}
+
+/* ---- Filas de datos ---- */
+.admin-row{
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  background: var(--white); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 18px; margin-bottom: 10px;
+}
+.admin-row.is-suspended{ opacity: .62; background: var(--eggshell-warm); }
+.admin-row-main{ flex: 1; min-width: 240px; }
+.admin-row-title{
+  font-weight: 700; color: var(--ink); font-size: 15px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.admin-row-sub{ font-size: 13px; color: var(--muted); margin-top: 3px; }
+.admin-row-note{ font-size: 13px; color: var(--muted); font-style: italic; margin-top: 6px; }
+.admin-row-actions{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.admin-empty{
+  background: var(--eggshell-warm); border: 1px dashed var(--line);
+  border-radius: 12px; padding: 28px; color: var(--muted); font-size: 14px; text-align: center;
+}
+.admin-more{ text-align: center; padding: 16px 0; }
+
+/* ---- Etiquetas de estado ---- */
+.status-chip{
+  display: inline-block; border-radius: 999px; padding: 2px 10px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  background: var(--eggshell); color: var(--muted); border: 1px solid var(--line);
+}
+.status-chip.pending{ background: #fdf3e7; color: #9a6a17; border-color: #f3d9b0; }
+.status-chip.approved{ background: #e8f5ec; color: var(--success); border-color: #b8dcc4; }
+.status-chip.rejected{ background: #fbeaea; color: var(--danger); border-color: #f0c9c9; }
+.status-chip.role-admin{ background: var(--keylime); color: var(--ink); border-color: var(--keylime-dk); }
+.status-chip.role-vendor{ background: var(--powder-soft); color: var(--cerulean-dk); border-color: var(--powder); }
+.status-chip.role-pm{ background: #e7eefb; color: var(--cerulean-dk); border-color: #c6d8f5; }
+
+/* ---- Tarjetas de la pestaña de datos ---- */
+.admin-card{
+  background: var(--white); border: 1px solid var(--line);
+  border-radius: 14px; padding: 22px; margin-bottom: 18px;
+}
+.admin-card h3{ font-size: 17px; font-weight: 800; margin-bottom: 8px; }
+.admin-card.danger{ border-color: #f0c9c9; background: #fdf6f6; }
+.admin-card code{
+  background: var(--eggshell); border-radius: 5px; padding: 1px 6px;
+  font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.admin-actions{ display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---- Registro de actividad ---- */
+.audit-item{
+  display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap;
+  padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px;
+}
+.audit-item:last-child{ border-bottom: none; }
+.audit-time{ color: var(--muted); min-width: 165px; }
+.audit-action{
+  font-weight: 700; color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+}
+.audit-actor{ color: var(--muted); }
+
+/* ---- Estados de reclamación (banners nuevos) ---- */
+.status-banner.pending{ background: #fdf3e7; border: 1px solid #f3d9b0; color: #9a6a17; }
+.status-banner.pending .status-ico{ background: #e08c20; }
+.status-banner.claim{ background: #e7eefb; border: 1px solid #c6d8f5; color: var(--cerulean-dk); }
+.status-banner.claim .status-ico{ background: var(--cerulean); }
+.status-banner.claim .btn{ margin-left: 10px; vertical-align: middle; }
+.unclaimed-chip{
+  display: inline-block; background: var(--eggshell); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 2px 10px; font-size: 12px; font-weight: 600;
+}
+
+/* ---- Indicador de fuerza de contraseña ---- */
+.pwd-hint{ display: block; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.pwd-hint.weak{ color: #9a6a17; }
+.pwd-hint.ok{ color: var(--success); font-weight: 600; }
+
+/* ---- Insignia de administrador en la cabecera ---- */
+.header-btn.admin-btn{
+  background: var(--keylime); color: var(--ink);
+  border-color: var(--keylime-dk); font-weight: 700;
+}
+.user-pill .role-chip{
+  background: var(--keylime); color: var(--ink);
+  border-radius: 999px; padding: 1px 8px;
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+}
+
+/* ---- Cobertura: notas y etiquetas (antes con estilos en línea) ---- */
+.coverage-note{
+  font-family: var(--serif); font-style: italic;
+  color: var(--muted); padding: 8px 0; font-size: 14px;
+}
+.coverage-chip{ font-size: 12px; color: var(--muted); font-weight: 600; margin-left: 10px; }
+.coverage-chip.full{ color: var(--cerulean); }
+
+/* =========================================================
+   ACCESIBILIDAD
+   El sitio tenía una sola regla :focus en casi 2.000 líneas: navegar con
+   teclado era prácticamente imposible. Estas reglas hacen visible dónde
+   está el foco y respetan a quien pide menos animación.
+   ========================================================= */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+.state-cell:focus-visible,
+.city-pill:focus-visible,
+.service-pill:focus-visible,
+.county-checkbox:focus-visible,
+.star-input span:focus-visible{
+  outline: 3px solid var(--cerulean);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.cat-card.disabled{ cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- Responsive del panel ---- */
+@media (max-width: 720px){
+  .admin-head h1{ font-size: 30px; }
+  .admin-row{ flex-direction: column; align-items: flex-start; }
+  .admin-row-actions{ width: 100%; }
+  .audit-time{ min-width: 0; }
+}
