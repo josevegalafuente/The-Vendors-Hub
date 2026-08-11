@@ -119,28 +119,16 @@
   }
 
   // ─── Estado de filtros ───────────────────────────────
-  let stateFilter = "all";
   let query = "";
 
   const statesGrid    = document.getElementById("statesGrid");
   const searchResults = document.getElementById("searchResults");
-  const regionEl      = document.getElementById("regionFilter");
-
-  /* El filtro superior pasa de "regiones" a los estados donde hay mercados. */
-  (function buildStateFilter(){
-    if(!regionEl) return;
-    const states = Array.from(new Set([].concat.apply([], MARKETS.map(m => m.states || [])))).sort();
-    regionEl.innerHTML =
-      `<button class="active" data-state="all" aria-pressed="true">All</button>` +
-      states.map(s => `<button data-state="${UI.escapeHtml(s)}" aria-pressed="false">${UI.escapeHtml(s)}</button>`).join("");
-  })();
-
+  /* Sin filtro por estado: son 35 mercados y caben de una sola vez. Una
+     barra con 25 siglas ocupaba toda la pantalla y ahorraba menos que
+     escribir dos letras en el buscador, que ya entiende siglas de estado. */
   function renderDefault(){
     searchResults.innerHTML = "";
-    regionEl.style.display = "";
-    const list = MARKETS.filter(m =>
-      stateFilter === "all" || (m.states || []).indexOf(stateFilter) > -1);
-    statesGrid.innerHTML = list.map(m =>
+    statesGrid.innerHTML = MARKETS.map(m =>
       marketCard(m, countByMarket[m.id] || 0,
                  `market.html?market=${encodeURIComponent(m.id)}`, "registered")
     ).join("");
@@ -149,7 +137,6 @@
   function renderSearch(){
     const q = query.trim().toLowerCase();
     statesGrid.innerHTML = "";
-    regionEl.style.display = "none";
     const sections = [];
 
     // 1) MERCADOS por nombre o por sigla de estado
@@ -283,19 +270,6 @@
     query = e.target.value;
     if(query.trim() === "") render();
     else runSearch();
-  });
-
-  regionEl.addEventListener("click", e => {
-    const btn = e.target.closest("button[data-state]");
-    if(!btn) return;
-    regionEl.querySelectorAll("button").forEach(b => {
-      b.classList.remove("active");
-      b.setAttribute("aria-pressed", "false");
-    });
-    btn.classList.add("active");
-    btn.setAttribute("aria-pressed", "true");
-    stateFilter = btn.dataset.state;
-    if(query.trim() === "") renderDefault();
   });
 
   render();
