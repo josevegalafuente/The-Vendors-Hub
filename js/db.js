@@ -1085,6 +1085,10 @@ window.DB = (function () {
 
   /* ---------- lo que exponemos al resto de la app ---------- */
   return {
+    /* Ya resuelto: con localStorage los datos están disponibles al instante.
+       Existe para que las páginas puedan hacer DB.ready.then(…) sin saber si
+       están sobre localStorage o sobre Firestore (ver js/db-firebase.js). */
+    ready: Promise.resolve({ backend: "local" }),
     // promesa que se resuelve cuando (y si) se cargan los correos locales
     contactsReady,
     // utilidades
