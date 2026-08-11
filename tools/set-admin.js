@@ -46,8 +46,8 @@ function die(msg) {
 }
 
 if (!fs.existsSync(KEY_FILE)) {
-  die("No encuentro tools/firebase-service-account.json\n" +
-      "   Descárgalo en: Firebase Console → Project settings → Service accounts\n" +
+  die("Cannot find tools/firebase-service-account.json\n" +
+      "   Download it at: Firebase Console → Project settings → Service accounts\n" +
       "   → Generate new private key");
 }
 
@@ -58,7 +58,7 @@ try {
   ({ initializeApp, cert } = require("firebase-admin/app"));
   ({ getAuth } = require("firebase-admin/auth"));
 } catch (err) {
-  die("Falta la dependencia. Ejecuta:  cd tools && npm install firebase-admin");
+  die("Missing dependency. Run:  cd tools && npm install firebase-admin");
 }
 
 initializeApp({ credential: cert(require(KEY_FILE)) });
@@ -70,7 +70,7 @@ const list = args.includes("--list");
 const email = args.find(a => !a.startsWith("--"));
 
 async function listAdmins() {
-  console.log("\nAdministradores actuales:\n");
+  console.log("\nCurrent administrators:\n");
   let found = 0;
   let pageToken;
   do {
@@ -83,7 +83,7 @@ async function listAdmins() {
     });
     pageToken = res.pageToken;
   } while (pageToken);
-  if (!found) console.log("  (ninguno todavía)");
+  if (!found) console.log("  (none yet)");
   console.log("");
 }
 
@@ -91,8 +91,8 @@ async function main() {
   if (list) { await listAdmins(); return; }
 
   if (!email) {
-    die("Falta el correo.\n" +
-        "   Uso:  node set-admin.js correo@ejemplo.com [--remove]\n" +
+    die("Missing email address.\n" +
+        "   Usage:  node set-admin.js someone@example.com [--remove]\n" +
         "         node set-admin.js --list");
   }
 
@@ -100,8 +100,8 @@ async function main() {
   try {
     user = await auth.getUserByEmail(email);
   } catch (err) {
-    die(`No existe ninguna cuenta con el correo ${email}.\n` +
-        "   Esa persona debe registrarse primero en el sitio.");
+    die(`No account exists with the email ${email}.\n` +
+        "   That person must register on the site first.");
   }
 
   const claims = Object.assign({}, user.customClaims || {});
@@ -114,12 +114,12 @@ async function main() {
   // dentro de una hora. Importante sobre todo al RETIRAR el rol.
   await auth.revokeRefreshTokens(user.uid);
 
-  console.log(`\n✅ ${remove ? "Rol de admin RETIRADO a" : "Rol de admin asignado a"} ${email}`);
-  console.log("   Cierra sesión y vuelve a entrar para que el token se refresque.\n");
+  console.log(`\n✅ Admin role ${remove ? "REMOVED from" : "granted to"} ${email}`);
+  console.log("   Sign out and back in so the token refreshes.\n");
 
   await listAdmins();
 }
 
 main()
   .then(() => process.exit(0))
-  .catch(err => die("Error inesperado: " + err.message));
+  .catch(err => die("Unexpected error: " + err.message));

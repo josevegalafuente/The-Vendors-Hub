@@ -80,7 +80,7 @@ window.Auth = (function(){
         );
         return "p1:" + PBKDF2_ITERATIONS + ":" + bytesToHex(bits);
       }catch(err){
-        console.warn("PBKDF2 no disponible, se usa SHA-256", err);
+        console.warn("PBKDF2 unavailable, falling back to SHA-256", err);
       }
     }
 
@@ -89,8 +89,8 @@ window.Auth = (function(){
       return "s2:" + bytesToHex(digest);
     }
 
-    console.warn("crypto.subtle no disponible (¿estás abriendo el sitio con file://?). " +
-                 "Se usa un hash de respaldo mucho más débil. Abre el sitio por http:// o https://.");
+    console.warn("crypto.subtle unavailable (are you opening the site with file://?). " +
+                 "Falling back to a much weaker hash. Serve the site over http:// or https://.");
     return "f1:" + fnv1a(salt + "::" + String(password));
   }
 

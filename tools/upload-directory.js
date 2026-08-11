@@ -57,7 +57,7 @@ function loadWindowFile(relPath, globalName) {
 const markets = loadWindowFile("data/markets.js", "MARKETS") || {};
 const vendors = loadWindowFile("data/vendors-data.js", "IMPORTED_VENDORS");
 if (!Array.isArray(vendors) || !vendors.length) {
-  die("No pude leer data/vendors-data.js");
+  die("Could not read data/vendors-data.js");
 }
 
 const contacts = loadWindowFile("data/vendors-contacts.local.js", "VENDOR_CONTACTS") || {};
@@ -107,30 +107,30 @@ for (let i = 0; i < items.length; i += CHUNK_SIZE) {
   chunks.push(items.slice(i, i + CHUNK_SIZE));
 }
 
-console.log("\n─── Resumen ─────────────────────────────────");
+console.log("\n─── Summary ─────────────────────────────────");
 console.log(`  Vendors:            ${items.length}`);
-console.log(`  Con correo:         ${withEmail}`);
-console.log(`  Sin correo:         ${items.length - withEmail}`);
-console.log(`  Trozos a escribir:  ${chunks.length} (+1 de metadatos)`);
-console.log(`  Lecturas por visita: ~${chunks.length + 1} en lugar de ${items.length}`);
+console.log(`  With email:         ${withEmail}`);
+console.log(`  Without email:      ${items.length - withEmail}`);
+console.log(`  Chunks to write:    ${chunks.length} (+1 metadata)`);
+console.log(`  Reads per visit:    ~${chunks.length + 1} instead of ${items.length}`);
 console.log("─────────────────────────────────────────────\n");
 
 if (withEmail === 0) {
-  console.log("⚠️  No se cargó ningún correo. Si esperabas los 1.179, comprueba que");
-  console.log("    existe data/vendors-contacts.local.js\n");
+  console.log("⚠️  No contact emails loaded. If you expected 1,179, check that");
+  console.log("    data/vendors-contacts.local.js exists\n");
 }
 
 if (dryRun) {
-  console.log("Modo --dry-run: no se ha escrito nada en Firestore.");
-  console.log("Ejemplo del primer vendor que se subiría:\n");
+  console.log("--dry-run mode: nothing was written to Firestore.");
+  console.log("Example of the first vendor that would be uploaded:\n");
   console.log(JSON.stringify(items[0], null, 2));
-  console.log("\nSi te cuadra, vuelve a ejecutar sin --dry-run.\n");
+  console.log("\nIf it looks right, run again without --dry-run.\n");
   process.exit(0);
 }
 
 /* ---------- 3. Subir ---------- */
 if (!fs.existsSync(KEY_FILE)) {
-  die("No encuentro tools/firebase-service-account.json\n" +
+  die("Cannot find tools/firebase-service-account.json\n" +
       "   Firebase Console → Project settings → Service accounts → Generate new private key");
 }
 
@@ -139,7 +139,7 @@ let initializeApp, cert, getFirestore, FieldValue;
 try {
   ({ initializeApp, cert } = require("firebase-admin/app"));
   ({ getFirestore, FieldValue } = require("firebase-admin/firestore"));
-} catch (err) { die("Ejecuta:  cd tools && npm install firebase-admin"); }
+} catch (err) { die("Run:  cd tools && npm install firebase-admin"); }
 
 initializeApp({ credential: cert(require(KEY_FILE)) });
 const db = getFirestore();
@@ -163,15 +163,15 @@ async function main() {
 
   await batch.commit();
 
-  console.log(`✅ Subidos ${items.length} vendors en ${chunks.length} trozos (versión ${version}).\n`);
-  console.log("Siguientes pasos:");
+  console.log(`✅ Uploaded ${items.length} vendors in ${chunks.length} chunks (version ${version}).\n`);
+  console.log("Next steps:");
   console.log("  1. firebase deploy --only firestore:rules");
-  console.log("  2. Comprueba en Firestore → Rules → Playground que un usuario");
-  console.log("     SIN sesión no puede leer 'directory'.");
-  console.log("  3. Cuando el sitio lea de Firestore, puedes borrar del repositorio");
+  console.log("  2. In Firestore → Rules → Playground, confirm that a user");
+  console.log("     WITHOUT a session cannot read 'directory'.");
+  console.log("  3. Once the site reads from Firestore, you can delete from the repo");
   console.log("     data/vendors-data.js y data/vendors-contacts.local.js\n");
 }
 
 main()
   .then(() => process.exit(0))
-  .catch(err => die("Error al subir: " + err.message));
+  .catch(err => die("Upload error: " + err.message));

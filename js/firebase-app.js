@@ -34,7 +34,7 @@ window.FB = (function () {
       s.src = src;
       s.async = false;          // el orden importa: app antes que auth/firestore
       s.onload = resolve;
-      s.onerror = () => reject(new Error("No se pudo cargar " + src));
+      s.onerror = () => reject(new Error("Could not load " + src));
       document.head.appendChild(s);
     });
   }
@@ -57,7 +57,7 @@ window.FB = (function () {
     if (!state.enabled) return state;
 
     if (!configLooksValid()) {
-      state.error = "La configuración de Firebase está incompleta en js/config.js";
+      state.error = "Firebase configuration is incomplete in js/config.js";
       console.error("[Firebase] " + state.error);
       return state;
     }
@@ -66,7 +66,7 @@ window.FB = (function () {
       for (const lib of LIBS) await loadScript(CDN + lib);
 
       if (!window.firebase || !firebase.initializeApp) {
-        throw new Error("El SDK cargó pero no expuso window.firebase");
+        throw new Error("The SDK loaded but did not expose window.firebase");
       }
 
       state.app = firebase.apps && firebase.apps.length
@@ -97,7 +97,7 @@ window.FB = (function () {
          o el usuario tiene un bloqueador que corta gstatic.com, seguimos con
          la capa local en vez de mostrar una página en blanco. */
       state.error = err.message;
-      console.error("[Firebase] No se pudo inicializar:", err);
+      console.error("[Firebase] Could not initialize:", err);
       return state;
     }
   }

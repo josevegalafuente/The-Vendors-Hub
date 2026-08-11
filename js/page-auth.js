@@ -225,7 +225,7 @@
       );
       return JSON.parse(json);
     }catch(e){
-      console.error("No se pudo leer el token de Google", e);
+      console.error("Could not read the Google token", e);
       return null;
     }
   }

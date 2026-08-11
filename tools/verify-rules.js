@@ -73,14 +73,14 @@ async function idTokenFor(uid, claims) {
     { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: custom, returnSecureToken: true }) });
   const j = await res.json();
-  if (!j.idToken) throw new Error("No pude obtener idToken: " + JSON.stringify(j).slice(0, 200));
+  if (!j.idToken) throw new Error("Could not obtain idToken: " + JSON.stringify(j).slice(0, 200));
   return j.idToken;
 }
 
 const TEST_EMAIL = "verificacion-temporal@example.invalid";
 
 async function main() {
-  console.log("\n══ VERIFICACIÓN DE REGLAS · " + PROJECT + " ══\n");
+  console.log("\n══ SECURITY RULES VERIFICATION · " + PROJECT + " ══\n");
 
   // Limpieza por si quedó de una ejecución anterior
   try { const old = await auth.getUserByEmail(TEST_EMAIL); await auth.deleteUser(old.uid); } catch (e) {}
@@ -88,38 +88,38 @@ async function main() {
   const user = await auth.createUser({ email: TEST_EMAIL, password: "prueba-temporal-2026", emailVerified: false });
 
   try {
-    console.log("── 1. SIN SESIÓN (cualquiera en internet) ──");
+    console.log("── 1. NO SESSION (anyone on the internet) ──");
     let r = await tryRead("directory/chunk-000", null);
-    check("no puede leer el directorio", r.status === 403, "HTTP " + r.status);
-    check("no obtiene ningún correo", !r.body.includes("@gmail.com"));
+    check("cannot read the directory", r.status === 403, "HTTP " + r.status);
+    check("gets no contact emails", !r.body.includes("@gmail.com"));
     r = await tryRead("directory/meta", null);
-    check("no puede leer los metadatos", r.status === 403, "HTTP " + r.status);
+    check("cannot read the metadata", r.status === 403, "HTTP " + r.status);
     r = await tryRead("users/" + user.uid, null);
-    check("no puede leer cuentas", r.status === 403, "HTTP " + r.status);
+    check("cannot read accounts", r.status === 403, "HTTP " + r.status);
     r = await tryWrite("directory/chunk-000", null, { hackeado: { stringValue: "si" } });
-    check("no puede escribir en el directorio", r.status === 403, "HTTP " + r.status);
+    check("cannot write to the directory", r.status === 403, "HTTP " + r.status);
 
-    console.log("\n── 2. CON SESIÓN pero CORREO SIN VERIFICAR ──");
+    console.log("\n── 2. SIGNED IN but EMAIL NOT VERIFIED ──");
     let token = await idTokenFor(user.uid);
     r = await tryRead("directory/chunk-000", token);
-    check("tampoco puede leer el directorio", r.status === 403, "HTTP " + r.status);
-    check("sigue sin obtener correos", !r.body.includes("@gmail.com"));
+    check("still cannot read the directory", r.status === 403, "HTTP " + r.status);
+    check("still gets no contact emails", !r.body.includes("@gmail.com"));
 
-    console.log("\n── 3. CON SESIÓN y CORREO VERIFICADO ──");
+    console.log("\n── 3. SIGNED IN and EMAIL VERIFIED ──");
     await auth.updateUser(user.uid, { emailVerified: true });
     token = await idTokenFor(user.uid);
     r = await tryRead("directory/chunk-000", token);
-    check("SÍ puede leer el directorio", r.status === 200, "HTTP " + r.status);
-    check("y ve los datos de los vendors", r.body.includes("All Property Maintenance"));
+    check("CAN read the directory", r.status === 200, "HTTP " + r.status);
+    check("and sees the vendor data", r.body.includes("All Property Maintenance"));
     r = await tryWrite("directory/chunk-000", token, { hackeado: { stringValue: "si" } });
-    check("pero NO puede modificarlo", r.status === 403, "HTTP " + r.status);
+    check("but CANNOT modify it", r.status === 403, "HTTP " + r.status);
 
-    console.log("\n── 4. INTENTO DE AUTOASCENSO A ADMIN ──");
+    console.log("\n── 4. SELF-PROMOTION TO ADMIN ATTEMPT ──");
     // Un usuario normal intenta escribir role:admin en su propio documento.
     r = await tryWrite("users/" + user.uid, token, {
       role: { stringValue: "admin" }, email: { stringValue: TEST_EMAIL }
     });
-    check("no puede darse el rol de admin", r.status === 403, "HTTP " + r.status);
+    check("cannot grant itself the admin role", r.status === 403, "HTTP " + r.status);
 
     // Y aunque falsifique el claim en el cliente, el token lo firma Google:
     // este token SÍ lleva role=admin porque lo firmamos NOSOTROS con la clave
@@ -130,48 +130,48 @@ async function main() {
     //     entero: apuntar esta prueba a directory/meta lo vaciaba.
     const adminToken = await idTokenFor(user.uid, { role: "admin" });
     r = await tryWrite("directory/__prueba-temporal", adminToken, { ok: { stringValue: "si" } });
-    check("un token con role=admin (firmado por el servidor) sí escribe", r.status === 200, "HTTP " + r.status);
+    check("a token with role=admin (server-signed) can write", r.status === 200, "HTTP " + r.status);
 
-    console.log("\n── 5. RESEÑAS: una por property manager y vendor ──");
+    console.log("\n── 5. REVIEWS: one per property manager and vendor ──");
     const pmToken = await idTokenFor(user.uid, { role: "pm" });
     const good = `l_demo__${user.uid}`;
     r = await tryWrite("reviews/" + good, pmToken, {
       vendorId: { stringValue: "l_demo" }, pmId: { stringValue: user.uid },
       stars: { integerValue: 5 }, comment: { stringValue: "prueba" }
     });
-    check("un PM puede dejar su reseña", r.status === 200, "HTTP " + r.status);
+    check("a PM can leave their review", r.status === 200, "HTTP " + r.status);
 
     r = await tryWrite("reviews/l_demo__otrapersona", pmToken, {
       vendorId: { stringValue: "l_demo" }, pmId: { stringValue: "otrapersona" },
       stars: { integerValue: 1 }, comment: { stringValue: "suplantación" }
     });
-    check("no puede escribir la reseña de otro", r.status === 403, "HTTP " + r.status);
+    check("cannot write someone else's review", r.status === 403, "HTTP " + r.status);
 
     r = await tryWrite("reviews/" + good, pmToken, {
       vendorId: { stringValue: "l_demo" }, pmId: { stringValue: user.uid },
       stars: { integerValue: 99 }, comment: { stringValue: "x" }
     });
-    check("no puede poner 99 estrellas", r.status === 403, "HTTP " + r.status);
+    check("cannot give 99 stars", r.status === 403, "HTTP " + r.status);
 
     const vendorToken = await idTokenFor(user.uid, { role: "vendor" });
     r = await tryWrite("reviews/l_demo2__" + user.uid, vendorToken, {
       vendorId: { stringValue: "l_demo2" }, pmId: { stringValue: user.uid },
       stars: { integerValue: 5 }, comment: { stringValue: "me auto-reseño" }
     });
-    check("un vendor no puede dejar reseñas", r.status === 403, "HTTP " + r.status);
+    check("a vendor cannot leave reviews", r.status === 403, "HTTP " + r.status);
 
-    console.log("\n── 6. RECLAMACIONES: solo el admin resuelve ──");
+    console.log("\n── 6. CLAIMS: only the admin resolves them ──");
     r = await tryWrite("claims/prueba1", vendorToken, {
       userId: { stringValue: user.uid }, ref: { stringValue: "x" },
       status: { stringValue: "pending" }, note: { stringValue: "es mío" }
     });
-    check("un vendor puede solicitar", r.status === 200, "HTTP " + r.status);
+    check("a vendor can submit a claim", r.status === 200, "HTTP " + r.status);
 
     r = await tryWrite("claims/prueba2", vendorToken, {
       userId: { stringValue: user.uid }, ref: { stringValue: "x" },
       status: { stringValue: "approved" }, note: { stringValue: "me la apruebo yo" }
     });
-    check("pero NO puede autoaprobársela", r.status === 403, "HTTP " + r.status);
+    check("but CANNOT approve it themselves", r.status === 403, "HTTP " + r.status);
 
   } finally {
     // Limpieza: borrar el usuario y los documentos de prueba.
@@ -181,11 +181,11 @@ async function main() {
       await fetch(`${FS}/${p}`, { method: "DELETE", headers: { Authorization: "Bearer " + adminCleanup } });
     }
     await auth.deleteUser(user.uid);
-    console.log("\n(usuario y documentos de prueba eliminados)");
+    console.log("\n(test user and documents removed)");
   }
 
   console.log("\n" + "═".repeat(52));
-  console.log(`  ${pass} comprobaciones pasaron · ${fail} fallaron`);
+  console.log(`  ${pass} checks passed · ${fail} failed`);
   console.log("═".repeat(52) + "\n");
   process.exit(fail > 0 ? 1 : 0);
 }

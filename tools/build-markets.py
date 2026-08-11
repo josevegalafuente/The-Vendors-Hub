@@ -57,7 +57,7 @@ def is_county(t):
 
 # Títulos descriptivos del informe que no sirven como nombre de mercado.
 RENAME = {
-    "Properties in TN market but not the state": "Tennessee (fuera del estado)",
+    "Properties in TN market but not the state": "Tennessee (out of state)",
     "Properties in the KC Market": "Kansas City",
     "Properties in Chicago but in the Columbia Market": "Columbia - St Louis",
 }

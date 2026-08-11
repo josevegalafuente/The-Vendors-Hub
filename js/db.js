@@ -67,7 +67,7 @@ window.DB = (function () {
       cache.set(key, value);
       return value;
     } catch (err) {
-      console.error("No se pudo leer", key, err);
+      console.error("Could not read", key, err);
       return fallback;
     }
   }
@@ -81,7 +81,7 @@ window.DB = (function () {
     } catch (err) {
       // El error típico aquí es QuotaExceeded (te pasaste de ~5 MB,
       // normalmente por subir imágenes o PDFs muy grandes en base64).
-      console.error("No se pudo guardar", key, err);
+      console.error("Could not save", key, err);
       cache.delete(key);
       return false;
     }

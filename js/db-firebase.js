@@ -28,7 +28,7 @@
   const LOCAL = window.DB;             // la capa de localStorage, como respaldo
   const CACHE_KEY = "tvh_fs_directory";
 
-  if (!LOCAL) { console.error("[DB] db.js debe cargarse antes que db-firebase.js"); return; }
+  if (!LOCAL) { console.error("[DB] db.js must load before db-firebase.js"); return; }
 
   /* La capa local expone `ready` ya resuelto, así que las páginas pueden
      hacer DB.ready.then(...) sin saber cuál de las dos está activa. */
@@ -90,7 +90,7 @@
   async function boot() {
     const st = await FB.ready;
     if (!st.available) {
-      console.warn("[DB] Firebase no disponible; se mantiene la capa local.");
+      console.warn("[DB] Firebase unavailable; keeping the local layer.");
       return { backend: "local", reason: st.error };
     }
 
@@ -184,13 +184,13 @@
     payload.updatedAt = Date.now();
 
     db.collection("users").doc(id).set(payload, { merge: true })
-      .catch(err => console.error("[DB] No se pudo guardar el perfil:", err));
+      .catch(err => console.error("[DB] Could not save the profile:", err));
     return true;
   };
 
   api.deleteUser = function (id) {
     db.collection("users").doc(id).delete()
-      .catch(err => console.error("[DB] No se pudo borrar la cuenta:", err));
+      .catch(err => console.error("[DB] Could not delete the account:", err));
     mem.users = mem.users.filter(u => u.id !== id);
     return true;
   };
@@ -260,7 +260,7 @@
     // y el administrador lo consolida al reimportar con tools/upload-directory.js
     db.collection("directory").doc("overrides").set(
       { [ref]: patch }, { merge: true }
-    ).catch(err => console.error("[DB] No se pudo actualizar la ficha:", err));
+    ).catch(err => console.error("[DB] Could not update the listing:", err));
     return true;
   };
 
@@ -284,7 +284,7 @@
     if (i > -1) mem.reviews[i] = withId; else mem.reviews.push(withId);
 
     db.collection("reviews").doc(docId).set(review)
-      .catch(err => console.error("[DB] No se pudo guardar la reseña:", err));
+      .catch(err => console.error("[DB] Could not save the review:", err));
     return true;
   };
 
@@ -302,7 +302,7 @@
                     status: "pending", createdAt: Date.now() };
     mem.claimsList.push(Object.assign({ id }, claim));
     db.collection("claims").doc(id).set(claim)
-      .catch(err => console.error("[DB] No se pudo enviar la solicitud:", err));
+      .catch(err => console.error("[DB] Could not submit the claim:", err));
     return { ok: true, claim: Object.assign({ id }, claim) };
   };
 
@@ -333,7 +333,7 @@
     claim.resolvedBy = adminUser.id;
     db.collection("claims").doc(claimId)
       .set({ status: decision, resolvedAt: claim.resolvedAt, resolvedBy: adminUser.id }, { merge: true })
-      .catch(err => console.error("[DB] No se pudo resolver la solicitud:", err));
+      .catch(err => console.error("[DB] Could not resolve the claim:", err));
 
     api.logAction(adminUser, decision === "approved" ? "claim.approve" : "claim.reject",
                   { claimId, ref: claim.ref });
@@ -373,7 +373,7 @@
   api.getStorageUsage = () => ({ bytes: 0, limit: 0, percent: 0, cloud: true });
 
   api.resetDemo = () => {
-    console.warn("[DB] resetDemo no aplica con Firestore.");
+    console.warn("[DB] resetDemo does not apply with Firestore.");
   };
 
   // ---- utilidades que sí dependen de los datos ----
@@ -464,7 +464,7 @@
   api.updateListing = function (ref, patch) { invalidate(); return _updateListing(ref, patch); };
 
   api.ready = boot().then(r => { invalidate(); return r; }).catch(err => {
-    console.error("[DB] Arranque de Firestore fallido; se mantiene la capa local.", err);
+    console.error("[DB] Firestore boot failed; keeping the local layer.", err);
     return { backend: "local", reason: err.message };
   });
 

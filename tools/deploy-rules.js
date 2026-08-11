@@ -13,8 +13,8 @@
 
    USO:
      cd tools
-     node deploy-rules.js --check     ← solo valida la sintaxis, no publica
-     node deploy-rules.js             ← valida y publica
+     node deploy-rules.js --check     <- validate syntax only, do not publish
+     node deploy-rules.js             <- validate and publish
    ========================================================================= */
 const fs = require("fs");
 const path = require("path");
@@ -26,8 +26,8 @@ const checkOnly = process.argv.includes("--check");
 
 function die(msg) { console.error("\n❌ " + msg + "\n"); process.exit(1); }
 
-if (!fs.existsSync(KEY_FILE)) die("Falta tools/firebase-service-account.json");
-if (!fs.existsSync(RULES_FILE)) die("Falta firestore.rules");
+if (!fs.existsSync(KEY_FILE)) die("Missing tools/firebase-service-account.json");
+if (!fs.existsSync(RULES_FILE)) die("Missing firestore.rules");
 
 const key = require(KEY_FILE);
 const PROJECT = key.project_id;
@@ -57,20 +57,20 @@ async function main() {
     source: { files: [{ name: "firestore.rules", content: source }] }
   };
 
-  console.log(`\nProyecto: ${PROJECT}`);
-  console.log(`Archivo:  firestore.rules (${source.length} bytes)\n`);
+  console.log(`\nProject: ${PROJECT}`);
+  console.log(`File:     firestore.rules (${source.length} bytes)\n`);
 
   // ── 1. Crear el ruleset (aquí se valida la sintaxis) ──
   const created = await api(client, "POST", `${BASE}/projects/${PROJECT}/rulesets`, ruleset);
 
   if (created.status !== 200) {
     const err = created.data && created.data.error;
-    console.error("❌ Las reglas NO son válidas:\n");
+    console.error("❌ The rules are NOT valid:\n");
     if (err && err.details) {
       err.details.forEach(d => {
         (d.issues || []).forEach(i => {
           const loc = i.sourcePosition || {};
-          console.error(`   línea ${loc.line || "?"}, col ${loc.column || "?"}: ${i.description}`);
+          console.error(`   line ${loc.line || "?"}, col ${loc.column || "?"}: ${i.description}`);
         });
       });
     } else {
@@ -81,11 +81,11 @@ async function main() {
   }
 
   const rulesetName = created.data.name;          // projects/X/rulesets/UUID
-  console.log("✓ Sintaxis válida. Ruleset creado:");
+  console.log("✓ Syntax valid. Ruleset created:");
   console.log("  " + rulesetName);
 
   if (checkOnly) {
-    console.log("\nModo --check: NO se ha publicado. Las reglas activas siguen siendo las de antes.\n");
+    console.log("\n--check mode: nothing was published. The active rules are unchanged.\n");
     return;
   }
 
@@ -102,12 +102,12 @@ async function main() {
   }
 
   if (res.status !== 200) {
-    die("No se pudo activar el release: " +
+    die("Could not activate the release: " +
         JSON.stringify(res.data && res.data.error ? res.data.error.message : res.data).slice(0, 400));
   }
 
-  console.log("\n✅ Reglas PUBLICADAS y activas en " + PROJECT);
-  console.log("   Compruébalo en: Firebase Console → Firestore → Reglas\n");
+  console.log("\n✅ Rules PUBLISHED and active on " + PROJECT);
+  console.log("   Check it at: Firebase Console → Firestore → Rules\n");
 }
 
 main().catch(e => die(e.message));
