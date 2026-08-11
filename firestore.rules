@@ -5,24 +5,28 @@ rules_version = '2';
    -------------------------------------------------------------------------
    AQUÍ es donde la seguridad se vuelve REAL.
 
-   Todo lo que hace hoy el navegador (comprobar roles, impedir que alguien
-   edite el perfil de otro, ocultar los correos de los vendors) es una
-   sugerencia: el código se ejecuta en el equipo del visitante y se puede
-   modificar. Estas reglas, en cambio, las aplica Google en SU servidor
-   antes de tocar la base de datos. Nadie las puede saltar, ni con las
-   herramientas de desarrollo, ni llamando a la API directamente.
+   Todo lo que hace el navegador (comprobar roles, impedir que alguien edite
+   el perfil de otro, ocultar los correos de los vendors) es una sugerencia:
+   el código se ejecuta en el equipo del visitante y se puede modificar.
+   Estas reglas, en cambio, las aplica Google en SU servidor antes de tocar
+   la base de datos. No se pueden saltar ni con las herramientas de
+   desarrollo, ni llamando a la API directamente.
 
    CÓMO SE PUBLICAN
-     npm install -g firebase-tools
-     firebase login
-     firebase deploy --only firestore:rules
+     node tools/deploy-rules.js         (usa la clave de servicio)
+     o bien:  firebase deploy --only firestore:rules
 
-   MODELO DE DATOS
-     users/{uid}          → una cuenta. El id es el uid de Firebase Auth.
-     listings/{ref}       → ficha del directorio importado.
-     listings/{ref}/reviews/{pmUid}  → reseña (una por property manager).
-     claims/{claimId}     → solicitud de un vendor para reclamar una ficha.
-     audit/{logId}        → registro de acciones de administración.
+   ─── MODELO DE DATOS ────────────────────────────────────────────────────
+     users/{uid}            Cuenta. El id ES el uid de Firebase Auth.
+     directory/meta         { version, chunks, count }
+     directory/chunk-000…   { items: [ …150 vendors… ] }
+     reviews/{vendorId__pmUid}   Reseña. El id impone 1 por PM y vendor.
+     claims/{claimId}       Solicitud de un vendor para reclamar una ficha.
+     audit/{logId}          Registro de acciones de administración.
+
+   El directorio va TROCEADO a propósito: 1.179 documentos sueltos costarían
+   1.179 lecturas por visita y el plan gratuito (50.000/día) aguantaría ~42
+   visitas. En 8 trozos son ~9 lecturas.
    ========================================================================= */
 
 service cloud.firestore {
@@ -34,104 +38,115 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // El correo verificado por Google/Firebase, no uno que envíe el cliente.
-    function verifiedEmail() {
+    /* Correo verificado. Decisión deliberada: registrarse NO basta para ver
+       nada. Sin pulsar el enlace del correo, la cuenta existe pero no puede
+       leer el directorio ni escribir reseñas.
+
+       Por qué importa: sin esto, cualquiera podría registrarse poniendo un
+       correo @purehomeriver.com que no es suyo, obtener el rol de Property
+       Manager y ver los datos de contacto de los 1.179 vendors. */
+    function verified() {
       return signedIn() && request.auth.token.email_verified == true;
     }
 
     /* El rol vive en un CUSTOM CLAIM del token, no en el documento del
-       usuario. Es importante: si el rol se leyera del documento, alguien
-       podría escribir "admin" en su propio documento y ascenderse solo.
-       Los claims solo se pueden establecer desde el servidor con el Admin
-       SDK (ver FIREBASE.md → "Nombrar un administrador"). */
+       usuario. Es la diferencia clave: si el rol se leyera de un documento,
+       cualquiera podría escribir "admin" en el suyo y ascenderse solo. Los
+       claims únicamente se escriben desde el servidor con el Admin SDK
+       (ver tools/set-admin.js). */
     function role() {
-      return signedIn() ? request.auth.token.role : null;
+      return signedIn() ? request.auth.token.get('role', '') : '';
     }
 
     function isAdmin()  { return role() == 'admin'; }
     function isVendor() { return role() == 'vendor'; }
-    function isPM()     { return role() == 'pm'; }
+    function isPM()     { return role() == 'pm' || role() == 'admin'; }
 
     function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
 
-    // Campos que el propio usuario NUNCA puede cambiar por su cuenta.
+    /* Campos que el propio usuario NUNCA puede cambiarse a sí mismo. */
     function protectedFieldsUnchanged() {
-      return request.resource.data.diff(resource.data)
-               .affectedKeys()
-               .hasAny(['role', 'status', 'claimedRef', 'createdAt']) == false;
+      return !request.resource.data.diff(resource.data)
+                .affectedKeys()
+                .hasAny(['role', 'status', 'claimedRef', 'createdAt', 'email']);
     }
 
     /* ─── users ─────────────────────────────────────────────────────── */
     match /users/{uid} {
-      // Cada quien lee su propia cuenta; el admin lee todas.
-      allow get: if isSelf(uid) || isAdmin();
+      allow get:  if isSelf(uid) || isAdmin();
       allow list: if isAdmin();
 
-      // Alta: solo tu propio documento, con rol no privilegiado.
+      /* Al registrarse NO se exige correo verificado: el documento debe poder
+         crearse en el mismo momento del alta, antes de que la persona abra
+         su correo. Lo que sí se exige es que no pueda nombrarse a sí misma
+         admin y que el correo del documento coincida con el del token. */
       allow create: if isSelf(uid)
-                    && verifiedEmail()
                     && request.resource.data.role in ['vendor', 'pm']
                     && request.resource.data.email == request.auth.token.email
                     && request.resource.data.status == 'active';
 
-      // Edición: tu propio perfil, pero sin tocar rol ni estado.
       allow update: if (isSelf(uid) && protectedFieldsUnchanged()) || isAdmin();
-
-      // Borrar cuentas es cosa del administrador.
       allow delete: if isAdmin();
     }
 
-    /* ─── listings (directorio) ─────────────────────────────────────── */
-    match /listings/{ref} {
-      /* ⚠️  CLAVE PARA LOS DATOS PERSONALES
-         Solo usuarios autenticados leen el directorio. Esto es lo que
-         resuelve de verdad el problema de los 1.179 correos de vendors
-         que hoy están en un archivo público: aquí ya no hay archivo que
-         descargar, y sin sesión no se sirve ni un byte. */
-      allow read: if signedIn();
+    /* ─── directory (el directorio de vendors) ──────────────────────── */
+    match /directory/{docId} {
+      /* ⚠️  ESTA LÍNEA ES LA QUE PROTEGE LOS DATOS PERSONALES.
+         Los correos de los 1.179 vendors estaban en un archivo público que
+         cualquiera podía descargar. Aquí no hay archivo: sin sesión con
+         correo verificado, Google no devuelve ni un byte. */
+      allow read: if verified();
 
-      // Solo el administrador crea o modifica fichas (importación, ocultar…).
-      allow create, update, delete: if isAdmin();
+      /* Solo el administrador toca el directorio (importación, ocultar
+         fichas, vincular una ficha reclamada). */
+      allow write: if isAdmin();
+    }
 
-      /* ─── reseñas ───
-         El id del documento es el uid del property manager: así la regla
-         "una reseña por PM y por vendor" la impone la base de datos, no
-         el código del navegador. */
-      match /reviews/{pmUid} {
-        allow read: if signedIn();
-        allow create, update: if isPM()
-                              && isSelf(pmUid)
-                              && request.resource.data.stars is int
-                              && request.resource.data.stars >= 1
-                              && request.resource.data.stars <= 5
-                              && request.resource.data.comment.size() <= 1000;
-        // Un PM puede retirar su reseña; el admin puede moderar.
-        allow delete: if isSelf(pmUid) || isAdmin();
-      }
+    /* ─── reviews ───────────────────────────────────────────────────── */
+    /* El id del documento es "{vendorId}__{uidDelPM}". Así la regla de
+       "una reseña por property manager y por vendor" la impone la base de
+       datos, no el código del navegador: no hay forma de crear una segunda. */
+    match /reviews/{reviewId} {
+      allow read: if verified();
+
+      allow create, update: if verified()
+        && isPM()
+        && reviewId == request.resource.data.vendorId + '__' + request.auth.uid
+        && request.resource.data.pmId == request.auth.uid
+        && request.resource.data.stars is int
+        && request.resource.data.stars >= 1
+        && request.resource.data.stars <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 1000;
+
+      /* Un PM puede retirar su reseña; el admin puede moderar cualquiera. */
+      allow delete: if isAdmin()
+                    || (verified() && resource.data.pmId == request.auth.uid);
     }
 
     /* ─── claims (reclamaciones de ficha) ───────────────────────────── */
     match /claims/{claimId} {
-      // Ves tus propias solicitudes; el admin las ve todas.
-      allow get: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow get:  if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow list: if isAdmin();
 
-      // Un vendor crea su solicitud, siempre en estado "pending".
-      allow create: if isVendor()
+      /* Un vendor crea su solicitud, siempre en estado "pending". */
+      allow create: if verified()
+                    && isVendor()
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.status == 'pending'
+                    && request.resource.data.note is string
                     && request.resource.data.note.size() <= 500;
 
-      // SOLO el administrador aprueba o rechaza. Aquí está la garantía de
-      // que nadie puede apropiarse de la ficha de otro negocio.
+      /* SOLO el administrador aprueba o rechaza. Aquí está la garantía de
+         que nadie puede apropiarse de la ficha de otro negocio. */
       allow update, delete: if isAdmin();
     }
 
     /* ─── audit (registro de acciones) ──────────────────────────────── */
     match /audit/{logId} {
       allow read: if isAdmin();
-      // Se escribe, nunca se modifica ni se borra: un registro que se puede
-      // editar no sirve como registro.
+      /* Se escribe, nunca se modifica ni se borra: un registro que se puede
+         editar no sirve como registro. */
       allow create: if signedIn();
       allow update, delete: if false;
     }

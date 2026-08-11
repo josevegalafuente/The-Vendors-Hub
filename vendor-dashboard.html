@@ -147,20 +147,26 @@
         <!-- Coverage -->
         <div class="panel">
           <div class="panel-head">
-            <h3>Coverage areas</h3>
-            <span class="count" id="areaCount">0 areas</span>
+            <h3>Coverage ZIP codes</h3>
+            <span class="count" id="areaCount">0 ZIP codes</span>
           </div>
           <p class="lede" style="font-size:14px; margin-bottom:16px;">
-            Click a state to add it. Click again to switch to county-level, then pick counties and cities.
+            Pick the ZIP codes you service. Use the checkboxes to take a whole market,
+            county or city at once, or search for a specific ZIP code or city.
           </p>
-          <div class="us-map-container">
-            <div class="us-map-grid" id="usMapGrid"></div>
-            <div class="map-legend">
-              <span><span class="swatch" style="background:var(--cerulean)"></span> Full state</span>
-              <span><span class="swatch" style="background:var(--keylime)"></span> Partial (counties)</span>
+
+          <div class="zip-toolbar">
+            <div class="search-box">
+              <input id="zipSearch" type="text" placeholder="Search a ZIP code, city or county…" />
             </div>
+            <button type="button" class="btn btn-sm btn-secondary" id="zipShowSelected">
+              Show only selected
+            </button>
+            <button type="button" class="btn btn-sm btn-danger" id="zipClearAll">Clear all</button>
           </div>
-          <div class="coverage-editor" id="coverageEditor"></div>
+
+          <div id="zipSelectedSummary" class="zip-summary"></div>
+          <div class="zip-picker" id="zipPicker"></div>
         </div>
 
         <div style="display:flex; justify-content:flex-end;">
@@ -176,7 +182,7 @@
 <footer class="site-footer"></footer>
 
 <script src="js/config.js"></script>
-<script src="data/locations.js"></script>
+<script src="data/markets.js"></script>
 <script src="data/services.js"></script>
 <script src="data/vendors-data.js"></script>
 <script src="js/db.js"></script>

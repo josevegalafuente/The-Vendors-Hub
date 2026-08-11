@@ -28,7 +28,7 @@
         <div class="hero-stats">
           <div class="hero-stat"><strong id="statVendors">0</strong><span>Vendors</span></div>
           <div class="hero-stat"><strong id="statCategories">0</strong><span>Categories</span></div>
-          <div class="hero-stat"><strong>50</strong><span>States</span></div>
+          <div class="hero-stat"><strong id="statMarkets">0</strong><span>Markets</span></div>
           <div class="hero-stat"><strong id="statAvgRating">N/A</strong><span>Avg. rating</span></div>
         </div>
       </div>
@@ -39,7 +39,7 @@
 
     <div class="markets-controls">
       <div class="search-box wide">
-        <input id="stateSearch" type="text" placeholder="Search a state, service or city (e.g. Florida, plumbing, Ocala)…" />
+        <input id="stateSearch" type="text" placeholder="Search a market, service, city or ZIP code (e.g. Dallas, plumbing, 34470)…" />
       </div>
       <div class="region-filter" id="regionFilter">
         <button class="active" data-region="all">All</button>
@@ -59,7 +59,7 @@
 <footer class="site-footer"></footer>
 
 <script src="js/config.js"></script>
-<script src="data/locations.js"></script>
+<script src="data/markets.js"></script>
 <script src="data/services.js"></script>
 <script src="data/vendors-data.js"></script>
 <script src="js/db.js"></script>

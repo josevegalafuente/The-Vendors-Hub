@@ -19,13 +19,11 @@
 
   // ─── Estado editable ─────────────────────────────────
   let selectedServices = new Set(profile.services || []);
-  // coverage: { estado: { mode: 'full'|'partial', counties: { 'Condado': ['Ciudad', …] } } }
-  let coverage = profile.coverage ? JSON.parse(JSON.stringify(profile.coverage)) : {};
+  // Se declara AQUÍ, con el resto del estado, porque renderProfileStatus()
+  // se ejecuta antes que el selector de ZIP y ya la necesita.
+  const selectedZips = new Set(Array.isArray(profile.zips) ? profile.zips : []);
   let avatar = profile.avatar || null;
   let licenses = Array.isArray(profile.licenses) ? profile.licenses.slice() : [];
-  // Qué condados están desplegados. Antes se perdía en cada redibujado y era
-  // molestísimo al ir marcando ciudades una a una.
-  const expandedCounties = new Set();
 
   // ─── Campos de texto ─────────────────────────────────
   const FIELD_IDS = ["businessName","contactName","addressLine","city","state","zip",
@@ -47,7 +45,7 @@
       snap[id] = el ? (el.value || "").trim() : ""; // campo del HTML rompía la página entera
     });
     snap.services = Array.from(selectedServices);
-    snap.coverage = coverage;
+    snap.zips = Array.from(selectedZips);
     return snap;
   }
 
@@ -278,243 +276,273 @@
   $("#serviceSearch").addEventListener("input", UI.debounce(e => renderServices(e.target.value), 150));
 
   /* =====================================================================
-     MAPA — rejilla geográfica de 11 columnas
-     ===================================================================== */
-  const MAP_LAYOUT = [
-    ["",  "",  "",  "",  "",  "",  "",  "",  "",  "",  "ME"],
-    ["AK","",  "",  "",  "",  "",  "",  "",  "VT","NH",""],
-    ["",  "",  "WA","ID","MT","ND","MN","",  "WI","NY","MA"],
-    ["",  "",  "OR","UT","WY","SD","IA","IL","MI","PA","CT"],
-    ["",  "",  "CA","NV","CO","NE","MO","IN","OH","NJ","RI"],
-    ["",  "",  "",  "AZ","NM","KS","AR","KY","WV","MD","DE"],
-    ["HI","",  "",  "",  "",  "OK","LA","TN","VA","",  ""],
-    ["",  "",  "",  "",  "TX","",  "MS","AL","GA","SC",""],
-    ["",  "",  "",  "",  "",  "",  "",  "",  "FL","NC",""]
-  ];
+     COBERTURA POR CÓDIGO POSTAL
+     ---------------------------------------------------------------------
+     Sustituye al mapa de EE. UU. + árbol condado/ciudad con tres modos
+     ("estado completo" / "condado completo" / "estas ciudades"). Aquella
+     interfaz tenía dos problemas: obligaba a mantener tres reglas distintas
+     sincronizadas, y ofrecía los 50 estados cuando la empresa solo opera en
+     35 mercados.
 
-  function renderMap(){
-    const grid = $("#usMapGrid");
-    grid.innerHTML = "";
-    MAP_LAYOUT.forEach(row => {
-      row.forEach(abbr => {
-        const cell = document.createElement("div");
-        cell.className = "state-cell";
-        if(!abbr){
-          cell.classList.add("empty");
-          cell.setAttribute("aria-hidden", "true");
-        } else {
-          cell.textContent = abbr;
-          const c = coverage[abbr];
-          if(c && c.mode === "full") cell.classList.add("selected");
-          else if(c && c.mode === "partial") cell.classList.add("partial");
-          const stateName = (STATES_DATA[abbr] || {}).name || abbr;
-          cell.title = stateName;
-          // Navegable por teclado (antes solo respondía al ratón).
-          cell.setAttribute("role", "button");
-          cell.setAttribute("tabindex", "0");
-          cell.setAttribute("aria-label", stateName);
-          cell.setAttribute("aria-pressed", String(!!c));
-          cell.addEventListener("click", () => onStateClick(abbr));
-          cell.addEventListener("keydown", e => {
-            if(e.key === "Enter" || e.key === " "){ e.preventDefault(); onStateClick(abbr); }
+     Ahora la selección es una lista plana de ZIP. La jerarquía
+     mercado → condado → ciudad sigue ahí, pero solo para navegar y marcar
+     en bloque; lo que se guarda son los códigos.
+     ===================================================================== */
+  const openMarkets = new Set();     // mercados desplegados
+  const openCounties = new Set();    // condados desplegados
+  let zipQuery = "";
+  let onlySelected = false;
+
+  const MARKETS_LIST = DB.getMarkets();
+
+  /* Índice de búsqueda: por cada ciudad, el texto donde buscar. Se construye
+     una vez, no en cada tecla. */
+  const searchIndex = (function(){
+    const rows = [];
+    MARKETS_LIST.forEach(m => {
+      const market = DB.getMarket(m.id);
+      Object.keys(market.counties).forEach(cty => {
+        const info = market.counties[cty];
+        Object.keys(info.cities).forEach(city => {
+          rows.push({
+            marketId: m.id, county: cty, city,
+            zips: info.cities[city],
+            hay: (m.name + " " + cty + " " + city + " " + info.cities[city].join(" ")).toLowerCase()
           });
-        }
-        grid.appendChild(cell);
+        });
+      });
+    });
+    return rows;
+  })();
+
+  function zipsOfCounty(marketId, county){ return DB.marketZips(marketId, county); }
+  function zipsOfMarket(marketId){ return DB.marketZips(marketId); }
+
+  function countSelected(list){
+    let n = 0;
+    for (const z of list) if (selectedZips.has(z)) n++;
+    return n;
+  }
+
+  /* Estado de una casilla de grupo: todas, algunas o ninguna. */
+  function tri(list){
+    const n = countSelected(list);
+    if (n === 0) return "none";
+    return n === list.length ? "all" : "some";
+  }
+
+  function setZips(list, on){
+    list.forEach(z => { if (on) selectedZips.add(z); else selectedZips.delete(z); });
+  }
+
+  function boxHtml(state){
+    const cls = state === "all" ? "checked" : (state === "some" ? "partial" : "");
+    const mark = state === "all" ? "✓" : (state === "some" ? "–" : "");
+    return `<span class="zip-box ${cls}" aria-hidden="true">${mark}</span>`;
+  }
+
+  /* ─── Render ─────────────────────────────────────── */
+  function renderZipPicker(){
+    const host = $("#zipPicker");
+    const q = zipQuery.trim().toLowerCase();
+
+    // Qué ciudades entran, según búsqueda y filtro "solo seleccionados"
+    let rows = searchIndex;
+    if (q) rows = rows.filter(r => r.hay.includes(q));
+    if (onlySelected) rows = rows.filter(r => countSelected(r.zips) > 0);
+
+    if (rows.length === 0){
+      host.innerHTML = `<div class="zip-empty">
+        ${q ? `No results for “${UI.escapeHtml(zipQuery)}”.`
+            : "You haven't selected any ZIP codes yet."}
+      </div>`;
+      return;
+    }
+
+    // Agrupar de nuevo en mercado → condado → ciudades
+    const byMarket = new Map();
+    rows.forEach(r => {
+      if (!byMarket.has(r.marketId)) byMarket.set(r.marketId, new Map());
+      const cs = byMarket.get(r.marketId);
+      if (!cs.has(r.county)) cs.set(r.county, []);
+      cs.get(r.county).push(r);
+    });
+
+    // Con búsqueda activa se despliega todo, que es lo que espera quien busca.
+    const forceOpen = !!q || onlySelected;
+
+    const html = [];
+    MARKETS_LIST.forEach(m => {
+      if (!byMarket.has(m.id)) return;
+      const counties = byMarket.get(m.id);
+      const allZips = zipsOfMarket(m.id);
+      const state = tri(allZips);
+      const open = forceOpen || openMarkets.has(m.id);
+      const sel = countSelected(allZips);
+
+      html.push(`
+        <div class="zip-market ${open ? "open" : ""}" data-market="${UI.escapeHtml(m.id)}">
+          <div class="zip-market-head">
+            <button type="button" class="zip-toggle" data-action="toggle-market"
+                    data-market="${UI.escapeHtml(m.id)}" aria-expanded="${open}">▾</button>
+            <label class="zip-check" data-action="pick-market" data-market="${UI.escapeHtml(m.id)}"
+                   role="checkbox" tabindex="0" aria-checked="${state === "all"}">
+              ${boxHtml(state)}
+              <span class="zip-name">${UI.escapeHtml(m.name)}</span>
+              <span class="zip-state">${UI.escapeHtml((m.states || []).join(" · "))}</span>
+            </label>
+            <span class="zip-count">${sel} / ${allZips.length}</span>
+          </div>
+          <div class="zip-market-body">
+            ${Array.from(counties.keys()).sort().map(cty => {
+              const cZips = zipsOfCounty(m.id, cty);
+              const cState = tri(cZips);
+              const cKey = m.id + "||" + cty;
+              const cOpen = forceOpen || openCounties.has(cKey);
+              return `
+                <div class="zip-county ${cOpen ? "open" : ""}">
+                  <div class="zip-county-head">
+                    <button type="button" class="zip-toggle" data-action="toggle-county"
+                            data-key="${UI.escapeHtml(cKey)}" aria-expanded="${cOpen}">▾</button>
+                    <label class="zip-check" data-action="pick-county"
+                           data-market="${UI.escapeHtml(m.id)}" data-county="${UI.escapeHtml(cty)}"
+                           role="checkbox" tabindex="0" aria-checked="${cState === "all"}">
+                      ${boxHtml(cState)}
+                      <span class="zip-name">${UI.escapeHtml(cty)}</span>
+                    </label>
+                    <span class="zip-count">${countSelected(cZips)} / ${cZips.length}</span>
+                  </div>
+                  <div class="zip-county-body">
+                    ${counties.get(cty).sort((a,b) => a.city.localeCompare(b.city)).map(r => {
+                      const rState = tri(r.zips);
+                      return `
+                        <div class="zip-city">
+                          <label class="zip-check" data-action="pick-city"
+                                 data-market="${UI.escapeHtml(m.id)}" data-county="${UI.escapeHtml(cty)}"
+                                 data-city="${UI.escapeHtml(r.city)}"
+                                 role="checkbox" tabindex="0" aria-checked="${rState === "all"}">
+                            ${boxHtml(rState)}
+                            <span class="zip-name">${UI.escapeHtml(r.city)}</span>
+                          </label>
+                          <div class="zip-list">
+                            ${r.zips.map(z => `
+                              <button type="button" class="zip-pill ${selectedZips.has(z) ? "selected" : ""}"
+                                      data-action="pick-zip" data-zip="${UI.escapeHtml(z)}"
+                                      aria-pressed="${selectedZips.has(z)}">${UI.escapeHtml(z)}</button>
+                            `).join("")}
+                          </div>
+                        </div>`;
+                    }).join("")}
+                  </div>
+                </div>`;
+            }).join("")}
+          </div>
+        </div>`);
+    });
+
+    host.innerHTML = html.join("");
+    host.querySelectorAll("[data-action]").forEach(el => {
+      el.addEventListener("click", onZipAction);
+      if (el.getAttribute("role") === "checkbox") {
+        el.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onZipAction(e); }
+        });
+      }
+    });
+  }
+
+  function onZipAction(e){
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget;
+    const { action, market, county, city, zip, key } = el.dataset;
+
+    if (action === "toggle-market"){
+      if (openMarkets.has(market)) openMarkets.delete(market); else openMarkets.add(market);
+      renderZipPicker();
+      return;
+    }
+    if (action === "toggle-county"){
+      if (openCounties.has(key)) openCounties.delete(key); else openCounties.add(key);
+      renderZipPicker();
+      return;
+    }
+
+    if (action === "pick-market"){
+      const list = zipsOfMarket(market);
+      setZips(list, tri(list) !== "all");
+      openMarkets.add(market);
+    } else if (action === "pick-county"){
+      const list = zipsOfCounty(market, county);
+      setZips(list, tri(list) !== "all");
+      openCounties.add(market + "||" + county);
+    } else if (action === "pick-city"){
+      const m = DB.getMarket(market);
+      const list = (m && m.counties[county] && m.counties[county].cities[city]) || [];
+      setZips(list, tri(list) !== "all");
+    } else if (action === "pick-zip"){
+      if (selectedZips.has(zip)) selectedZips.delete(zip); else selectedZips.add(zip);
+    }
+
+    refreshCoverage();
+  }
+
+  /* Resumen de lo elegido, arriba del selector. */
+  function renderZipSummary(){
+    const box = $("#zipSelectedSummary");
+    if (selectedZips.size === 0){
+      box.innerHTML = `<div class="zip-summary-empty">No coverage selected yet — property managers
+        won't find you until you pick at least one ZIP code.</div>`;
+      return;
+    }
+    const summary = DB.coverageSummary({ profile: { zips: Array.from(selectedZips) } });
+    box.innerHTML = summary.map(s => `
+      <span class="zip-chip">
+        <strong>${UI.escapeHtml(s.marketName)}</strong>
+        ${s.covered} of ${s.total}
+        <button type="button" class="zip-chip-x" data-drop-market="${UI.escapeHtml(s.marketId)}"
+                title="Remove this market" aria-label="Remove ${UI.escapeHtml(s.marketName)}">✕</button>
+      </span>`).join("");
+
+    box.querySelectorAll("[data-drop-market]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        setZips(zipsOfMarket(btn.dataset.dropMarket), false);
+        refreshCoverage();
       });
     });
   }
 
-  // Ciclo: sin cobertura → estado completo → por condados → sin cobertura
-  function onStateClick(abbr){
-    const c = coverage[abbr];
-    if(!c) coverage[abbr] = { mode: "full", counties: {} };
-    else if(c.mode === "full") coverage[abbr] = { mode: "partial", counties: c.counties || {} };
-    else delete coverage[abbr];
-    refreshCoverage();
-  }
-
-  /* =====================================================================
-     EDITOR DE COBERTURA (condados + ciudades por estado)
-     ===================================================================== */
-  function renderCoverageEditor(){
-    const editor = $("#coverageEditor");
-    const stateAbbrs = Object.keys(coverage);
-    if(stateAbbrs.length === 0){
-      editor.innerHTML = `<div class="coverage-editor-empty">Click a state on the map above to start defining your coverage.</div>`;
-      return;
-    }
-    editor.innerHTML = stateAbbrs.map(renderStateBlock).join("");
-    editor.querySelectorAll("[data-action]").forEach(el => {
-      el.addEventListener("click", onCoverageAction);
-    });
-  }
-
-  function renderStateBlock(abbr){
-    const stateData = STATES_DATA[abbr];
-    const c = coverage[abbr];
-    const isFull = c.mode === "full";
-    const totalCounties = stateData ? Object.keys(stateData.counties).length : 0;
-    const selectedCounties = Object.keys(c.counties || {}).length;
-    const stateName = stateData ? stateData.name : abbr;
-
-    let body;
-    if(isFull){
-      body = `<div class="coverage-note">
-        Full state coverage · all counties and cities in ${UI.escapeHtml(stateName)} are included.
-      </div>`;
-    } else {
-      const counties = stateData ? Object.entries(stateData.counties) : [];
-      body = counties.length === 0
-        ? `<div class="coverage-note">No county data available for this state.</div>`
-        : `<div class="county-list">
-             ${counties.map(([countyName, cities]) => renderCountyRow(abbr, countyName, cities)).join("")}
-           </div>`;
-    }
-
-    return `
-      <div class="state-coverage-block" data-state="${UI.escapeHtml(abbr)}">
-        <div class="state-coverage-head">
-          <div class="state-name">
-            <strong>${UI.escapeHtml(abbr)}</strong> · ${UI.escapeHtml(stateName)}
-            ${isFull
-              ? `<span class="coverage-chip full">Full coverage</span>`
-              : `<span class="coverage-chip">${selectedCounties} of ${totalCounties} counties</span>`}
-          </div>
-          <div class="actions">
-            <div class="coverage-mode">
-              <button type="button" class="${isFull ? 'active' : ''}" data-action="mode-full" data-state="${UI.escapeHtml(abbr)}">Full state</button>
-              <button type="button" class="${!isFull ? 'active' : ''}" data-action="mode-partial" data-state="${UI.escapeHtml(abbr)}">Counties</button>
-            </div>
-            <button type="button" class="btn btn-sm btn-danger" data-action="remove-state" data-state="${UI.escapeHtml(abbr)}">Remove</button>
-          </div>
-        </div>
-        ${body}
-      </div>
-    `;
-  }
-
-  function countyKey(stateAbbr, countyName){ return stateAbbr + "::" + countyName; }
-
-  function renderCountyRow(stateAbbr, countyName, cities){
-    const c = coverage[stateAbbr];
-    const selected = (c.counties && c.counties[countyName]) || null;
-    // selected = null (no seleccionado) o arreglo de ciudades.
-    // Arreglo vacío = condado completo.
-    const isCountyFull = selected !== null && selected.length === 0;
-    const isCountyPartial = selected !== null && selected.length > 0;
-    const isAnySelected = selected !== null;
-
-    const checkboxClass = isCountyFull ? "checked" : (isCountyPartial ? "partial" : "");
-    // Recuerda si el usuario lo había desplegado a mano.
-    const isExpanded = expandedCounties.has(countyKey(stateAbbr, countyName)) || isAnySelected;
-    const collapsed = isExpanded ? "" : "collapsed";
-
-    const sAttr = UI.escapeHtml(stateAbbr);
-    const cAttr = UI.escapeHtml(countyName);
-
-    return `
-      <div class="county-row ${collapsed}" data-state="${sAttr}" data-county="${cAttr}">
-        <div class="county-head">
-          <div class="county-checkbox ${checkboxClass}" role="checkbox" tabindex="0"
-               aria-checked="${isCountyFull}" aria-label="${cAttr}"
-               data-action="toggle-county" data-state="${sAttr}" data-county="${cAttr}">
-            ${isCountyFull ? "✓" : (isCountyPartial ? "•" : "")}
-          </div>
-          <div class="county-name" data-action="expand" data-state="${sAttr}" data-county="${cAttr}">${cAttr}</div>
-          <div class="city-count">
-            ${isCountyFull ? `All ${cities.length} cities` :
-              isCountyPartial ? `${selected.length} of ${cities.length} cities` :
-              `${cities.length} cities`}
-          </div>
-          <span class="toggle-icon" data-action="expand" data-state="${sAttr}" data-county="${cAttr}">▾</span>
-        </div>
-        <div class="county-cities">
-          ${cities.map(city => {
-            const cityActive = isCountyFull || (isCountyPartial && selected.includes(city));
-            return `<button type="button" class="city-pill ${cityActive ? 'selected' : ''}"
-              aria-pressed="${cityActive}"
-              data-action="toggle-city" data-state="${sAttr}" data-county="${cAttr}"
-              data-city="${UI.escapeHtml(city)}">${UI.escapeHtml(city)}</button>`;
-          }).join("")}
-        </div>
-      </div>
-    `;
-  }
-
-  function onCoverageAction(e){
-    e.stopPropagation();
-    const el = e.currentTarget;
-    const { action, state: stateAbbr, county: countyName, city: cityName } = el.dataset;
-
-    if(action === "expand"){
-      // Solo abre/cierra: no hace falta redibujar nada.
-      const row = el.closest(".county-row");
-      if(row){
-        row.classList.toggle("collapsed");
-        const key = countyKey(stateAbbr, countyName);
-        if(row.classList.contains("collapsed")) expandedCounties.delete(key);
-        else expandedCounties.add(key);
-      }
-      return;
-    }
-
-    if(action === "mode-full"){
-      coverage[stateAbbr] = { mode: "full", counties: {} };
-    }
-    else if(action === "mode-partial"){
-      const cur = coverage[stateAbbr];
-      coverage[stateAbbr] = { mode: "partial", counties: (cur && cur.counties) || {} };
-    }
-    else if(action === "remove-state"){
-      delete coverage[stateAbbr];
-    }
-    else if(action === "toggle-county"){
-      const c = coverage[stateAbbr];
-      if(!c.counties) c.counties = {};
-      if(c.counties[countyName] !== undefined) delete c.counties[countyName];
-      else c.counties[countyName] = [];        // arreglo vacío = todas las ciudades
-      expandedCounties.add(countyKey(stateAbbr, countyName));
-    }
-    else if(action === "toggle-city"){
-      const c = coverage[stateAbbr];
-      if(!c.counties) c.counties = {};
-      const stateData = STATES_DATA[stateAbbr];
-      const allCities = (stateData && stateData.counties && stateData.counties[countyName]) || [];
-      let current = c.counties[countyName];
-
-      if(current === undefined){
-        c.counties[countyName] = [cityName];                       // aún sin condado → esta ciudad
-      } else if(current.length === 0){
-        c.counties[countyName] = allCities.filter(ci => ci !== cityName);  // estaba completo → todas menos esta
-      } else {
-        current = current.includes(cityName)
-          ? current.filter(ci => ci !== cityName)
-          : current.concat([cityName]);
-        if(current.length === 0) delete c.counties[countyName];           // ninguna → fuera el condado
-        else if(current.length === allCities.length) c.counties[countyName] = [];  // todas → condado completo
-        else c.counties[countyName] = current;
-      }
-      expandedCounties.add(countyKey(stateAbbr, countyName));
-    }
-
-    refreshCoverage();
-  }
-
   function updateAreaCount(){
-    let count = 0;
-    Object.values(coverage).forEach(c => {
-      if(c.mode === "full") count += 1;
-      else count += Object.keys(c.counties || {}).length;
-    });
-    $("#areaCount").textContent = `${count} ${count === 1 ? "area" : "areas"}`;
+    const n = selectedZips.size;
+    $("#areaCount").textContent = `${n} ZIP ${n === 1 ? "code" : "codes"}`;
   }
 
   function refreshCoverage(){
-    renderMap();
-    renderCoverageEditor();
+    renderZipPicker();
+    renderZipSummary();
     updateAreaCount();
     renderProfileStatus();
   }
+
+  $("#zipSearch").addEventListener("input", UI.debounce(e => {
+    zipQuery = e.target.value;
+    renderZipPicker();
+  }, 180));
+
+  $("#zipShowSelected").addEventListener("click", () => {
+    onlySelected = !onlySelected;
+    $("#zipShowSelected").classList.toggle("active", onlySelected);
+    $("#zipShowSelected").textContent = onlySelected ? "Show all" : "Show only selected";
+    renderZipPicker();
+  });
+
+  $("#zipClearAll").addEventListener("click", () => {
+    if (selectedZips.size === 0) return;
+    if (!UI.confirmAction(`Remove all ${selectedZips.size} ZIP codes from your coverage?`)) return;
+    selectedZips.clear();
+    refreshCoverage();
+  });
+
   refreshCoverage();
 
   /* =====================================================================
@@ -559,7 +587,7 @@
       avatar,
       licenses,
       services: Array.from(selectedServices),
-      coverage
+      zips: Array.from(selectedZips).sort()
     });
 
     const ok = DB.updateUser(user.id, { profile: profilePatch });

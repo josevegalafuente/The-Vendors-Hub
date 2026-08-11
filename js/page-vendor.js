@@ -9,7 +9,7 @@
   if (!user) { window.location.replace("auth.html"); return; }
 
   const id = UI.getQueryParam("id");
-  const stateAbbr = UI.getQueryParam("state");
+  const marketId = UI.getQueryParam("market");
   const catId = UI.getQueryParam("cat");
 
   const vendor = DB.getVendorById(id);
@@ -23,12 +23,12 @@
     { label: "Home", href: "index.html" },
     { label: "Markets", href: "markets.html" }
   ];
-  const stateData = stateAbbr ? STATES_DATA[stateAbbr] : null;
+  const market = marketId ? DB.getMarket(marketId) : null;
   const category = catId ? VENDOR_CATEGORIES.find(c => c.id === catId) : null;
-  if (stateData) crumbs.push({ label: stateData.name, href: `market.html?state=${encodeURIComponent(stateAbbr)}` });
-  if (stateData && category) {
+  if (market) crumbs.push({ label: market.name, href: `market.html?market=${encodeURIComponent(marketId)}` });
+  if (market && category) {
     crumbs.push({ label: category.name,
-      href: `category.html?state=${encodeURIComponent(stateAbbr)}&cat=${encodeURIComponent(catId)}` });
+      href: `category.html?market=${encodeURIComponent(marketId)}&cat=${encodeURIComponent(catId)}` });
   }
   crumbs.push({ label: p.businessName || "Vendor" });
   UI.mountChrome(crumbs, true);
@@ -42,12 +42,12 @@
   if (isOwner) {
     back.href = "vendor-dashboard.html";
     $("#backLinkText").textContent = "Back to edit";
-  } else if (stateData && category) {
-    back.href = `category.html?state=${encodeURIComponent(stateAbbr)}&cat=${encodeURIComponent(catId)}`;
+  } else if (market && category) {
+    back.href = `category.html?market=${encodeURIComponent(marketId)}&cat=${encodeURIComponent(catId)}`;
     $("#backLinkText").textContent = `Back to ${category.name}`;
-  } else if (stateData) {
-    back.href = `market.html?state=${encodeURIComponent(stateAbbr)}`;
-    $("#backLinkText").textContent = `Back to ${stateData.name}`;
+  } else if (market) {
+    back.href = `market.html?market=${encodeURIComponent(marketId)}`;
+    $("#backLinkText").textContent = `Back to ${market.name}`;
   } else {
     back.href = "markets.html";
     $("#backLinkText").textContent = "Back to markets";
@@ -166,32 +166,29 @@
       }).join("")
     : `<p class="about-text muted">No services listed.</p>`;
 
-  // ─── Cobertura ───────────────────────────────────────
-  const coverage = p.coverage || {};
-  const stateKeys = Object.keys(coverage);
-  if (stateKeys.length === 0) {
+  /* ─── Cobertura ───────────────────────────────────────
+     Se muestra agrupada por mercado y condado, con el número de códigos
+     postales atendidos sobre el total. Antes decía "Full state", que sonaba
+     rotundo y no significaba gran cosa; "412 de 548 ZIP" sí es comprobable. */
+  const summary2 = DB.coverageSummary(vendor);
+  if (summary2.length === 0) {
     $("#coverageBlock").innerHTML = `<p class="about-text muted">No coverage areas defined.</p>`;
   } else {
-    $("#coverageBlock").innerHTML = stateKeys.map(abbr => {
-      const sd = STATES_DATA[abbr];
-      const c = coverage[abbr];
-      const stateName = sd ? sd.name : abbr;
-      if (c.mode === "full") {
-        return `<div class="state-block">
-          <div class="state-name">${UI.escapeHtml(stateName)}
-            <span class="scope-badge">Full state</span></div>
-        </div>`;
-      }
-      const counties = Object.entries(c.counties || {});
-      const detail = counties.map(([county, cities]) =>
-        cities && cities.length
-          ? `${UI.escapeHtml(county)} (${cities.map(UI.escapeHtml).join(", ")})`
-          : `${UI.escapeHtml(county)} (all cities)`
-      ).join(" · ");
+    $("#coverageBlock").innerHTML = summary2.map(s2 => {
+      const full = s2.covered === s2.total;
+      const counties = Object.keys(s2.counties).sort();
+      const detail = counties.map(cty => {
+        const c = s2.counties[cty];
+        const cf = c.zips.length === c.total;
+        return `<span class="cov-county" title="${UI.escapeHtml(c.zips.join(", "))}">` +
+               `${UI.escapeHtml(cty)} <em>${cf ? "all " + c.total : c.zips.length + " of " + c.total}</em></span>`;
+      }).join("");
       return `<div class="state-block">
-        <div class="state-name">${UI.escapeHtml(stateName)}
-          <span class="scope-badge">${counties.length} ${counties.length === 1 ? "county" : "counties"}</span></div>
-        <div class="scope-detail">${detail || "No counties selected"}</div>
+        <div class="state-name">${UI.escapeHtml(s2.marketName)}
+          <span class="scope-badge">${full ? "Full market" : s2.covered + " of " + s2.total + " ZIP"}</span>
+          <span class="cov-states">${UI.escapeHtml((s2.states || []).join(" · "))}</span>
+        </div>
+        <div class="scope-detail">${detail}</div>
       </div>`;
     }).join("");
   }

@@ -1,18 +1,16 @@
 /* =========================================================================
-   page-markets.js — directorio con BÚSQUEDA UNIVERSAL.
-   La barra de búsqueda entiende tres tipos de consulta:
-     1) Estado   → "Florida", "FL"          → tarjetas de estado
-     2) Servicio → "plumbing", "electrical" → en qué mercados hay y cuántos
-     3) Ciudad   → "Ocala"                  → vendors que cubren esa ciudad
-   Sin texto, muestra todos los estados (filtrables por región).
+   page-markets.js — directorio de MERCADOS con búsqueda universal.
 
-   RENDIMIENTO
-   Con 1.179 vendors, la versión anterior recorría ~59.000 combinaciones en
-   CADA pulsación de tecla, más los 455 KB del archivo de ciudades. Ahora:
-     · los índices vendor→estado y vendor→servicio los construye db.js una
-       sola vez por carga;
-     · el índice de ciudades se construye aquí una vez, no en cada tecla;
-     · la búsqueda espera 180 ms a que dejes de escribir (debounce).
+   Antes esta página listaba los 50 estados. El sitio ofrecía cobertura en
+   sitios donde la empresa no tiene ni una propiedad: 24 tarjetas vacías que
+   solo servían para hacer perder el tiempo. Ahora lista los 35 mercados
+   reales de HomeRiver Group.
+
+   La barra de búsqueda entiende cuatro tipos de consulta:
+     1) Mercado  → "Florida", "Dallas"      → tarjetas de mercado
+     2) Servicio → "plumbing", "electrical" → en qué mercados hay y cuántos
+     3) Ciudad   → "Ocala"                  → vendors que la cubren
+     4) ZIP      → "34470"                  → vendors que atienden ese código
    ========================================================================= */
 (function(){
   const user = Auth.requireRole("pm", "auth.html?role=pm");
@@ -25,16 +23,15 @@
 
   UI.pickRandomIllustration("heroIllustration");
 
-  const STATES_LIST = Object.entries(STATES_DATA).map(([abbr, data]) => ({
-    abbr, name: data.name, region: data.region
-  })).sort((a, b) => a.name.localeCompare(b.name));
-
+  const MARKETS = DB.getMarkets();
   const vendors = DB.getAllVendors();
-  const vendorsByState = DB.countVendorsByState();
+  const countByMarket = DB.countVendorsByMarket();
 
   // ─── Stats superiores ────────────────────────────────
   document.getElementById("statVendors").textContent = vendors.length.toLocaleString();
   document.getElementById("statCategories").textContent = VENDOR_CATEGORIES.length;
+  const statMarkets = document.getElementById("statMarkets");
+  if(statMarkets) statMarkets.textContent = MARKETS.length;
   (function(){
     let sum = 0, n = 0;
     vendors.forEach(v => {
@@ -44,22 +41,25 @@
     document.getElementById("statAvgRating").textContent = n > 0 ? (sum / n).toFixed(1) : "N/A";
   })();
 
-  /* ─── Índice de ciudades ──────────────────────────────
-     Se construye la PRIMERA vez que alguien busca algo que parece una
-     ciudad, no al cargar la página: así no penalizamos a quien solo quiere
-     ver la lista de estados. */
+  /* Índice de ciudades y ZIP. Se construye la primera vez que hace falta,
+     no al cargar: quien solo quiere ver la lista de mercados no lo paga. */
   let cityIndex = null;
   function getCityIndex(){
     if(cityIndex) return cityIndex;
     cityIndex = [];
-    for(const abbr in STATES_DATA){
-      const sd = STATES_DATA[abbr];
-      for(const county in sd.counties){
-        for(const city of sd.counties[county]){
-          cityIndex.push({ abbr, stateName: sd.name, county, city, lower: city.toLowerCase() });
-        }
-      }
-    }
+    MARKETS.forEach(m => {
+      const market = DB.getMarket(m.id);
+      Object.keys(market.counties).forEach(cty => {
+        const info = market.counties[cty];
+        Object.keys(info.cities).forEach(city => {
+          cityIndex.push({
+            marketId: m.id, marketName: m.name, county: cty,
+            state: info.state, city, zips: info.cities[city],
+            lower: city.toLowerCase()
+          });
+        });
+      });
+    });
     return cityIndex;
   }
 
@@ -78,28 +78,26 @@
     if(q.length < 2) return false;
     if(haystack.includes(q) || q.includes(haystack)) return true;
     if(SYNONYMS[q] && haystack.includes(SYNONYMS[q])) return true;
-    // prefijo compartido de 4+ letras (cubre "plumber" ↔ "plumbing")
     let n = 0;
     while(n < haystack.length && n < q.length && haystack[n] === q[n]) n++;
     return n >= 4;
   }
 
-  // count: número; suffix: texto opcional tras "vendor(s)" (ej. "registered")
-  function stateCard(abbr, name, region, count, href, suffix){
+  function marketCard(m, count, href, suffix){
     const noun = count === 1 ? "vendor" : "vendors";
     const tail = suffix ? " " + suffix : "";
     return `
       <a class="state-card" href="${UI.escapeHtml(href)}">
-        <span class="region-tag">${UI.escapeHtml(region)}</span>
-        <div class="abbr">${UI.escapeHtml(abbr)}</div>
-        <div class="name">${UI.escapeHtml(name)}</div>
+        <span class="region-tag">${UI.escapeHtml((m.states || []).join(" · "))}</span>
+        <div class="market-name">${UI.escapeHtml(m.name)}</div>
+        <div class="market-zips">${m.zipCount.toLocaleString()} ZIP codes</div>
         <div class="vendors ${count === 0 ? 'zero' : ''}">
           <strong>${count}</strong> ${noun}${tail}
         </div>
       </a>`;
   }
 
-  function vendorRow(v, cityLabel){
+  function vendorRow(v, label){
     const p = v.profile || {};
     const r = DB.getRatingSummary(v);
     const svc = (p.services || []).slice(0, 3);
@@ -111,7 +109,7 @@
         <div class="vendor-info">
           <h4>${UI.escapeHtml(p.businessName)}</h4>
           <div class="tags">
-            ${cityLabel ? `<span class="tag hl">${UI.escapeHtml(cityLabel)}</span>` : ""}
+            ${label ? `<span class="tag hl">${UI.escapeHtml(label)}</span>` : ""}
             ${ratingTag}
             ${svc.map(s => `<span class="tag">${UI.escapeHtml(s)}</span>`).join("")}
           </div>
@@ -121,43 +119,50 @@
   }
 
   // ─── Estado de filtros ───────────────────────────────
-  let regionFilter = "all";
+  let stateFilter = "all";
   let query = "";
 
   const statesGrid    = document.getElementById("statesGrid");
   const searchResults = document.getElementById("searchResults");
   const regionEl      = document.getElementById("regionFilter");
 
-  // ─── Vista por defecto (sin búsqueda) ────────────────
+  /* El filtro superior pasa de "regiones" a los estados donde hay mercados. */
+  (function buildStateFilter(){
+    if(!regionEl) return;
+    const states = Array.from(new Set([].concat.apply([], MARKETS.map(m => m.states || [])))).sort();
+    regionEl.innerHTML =
+      `<button class="active" data-state="all" aria-pressed="true">All</button>` +
+      states.map(s => `<button data-state="${UI.escapeHtml(s)}" aria-pressed="false">${UI.escapeHtml(s)}</button>`).join("");
+  })();
+
   function renderDefault(){
     searchResults.innerHTML = "";
     regionEl.style.display = "";
-    const filtered = STATES_LIST.filter(s => regionFilter === "all" || s.region === regionFilter);
-    statesGrid.innerHTML = filtered.map(s =>
-      stateCard(s.abbr, s.name, s.region, vendorsByState[s.abbr] || 0,
-                `market.html?state=${encodeURIComponent(s.abbr)}`, "registered")
+    const list = MARKETS.filter(m =>
+      stateFilter === "all" || (m.states || []).indexOf(stateFilter) > -1);
+    statesGrid.innerHTML = list.map(m =>
+      marketCard(m, countByMarket[m.id] || 0,
+                 `market.html?market=${encodeURIComponent(m.id)}`, "registered")
     ).join("");
   }
 
-  // ─── Vista de búsqueda ───────────────────────────────
   function renderSearch(){
     const q = query.trim().toLowerCase();
     statesGrid.innerHTML = "";
     regionEl.style.display = "none";
     const sections = [];
 
-    // 1) ESTADOS por nombre/abreviatura
-    const stateMatches = STATES_LIST.filter(s =>
-      s.name.toLowerCase().includes(q) || s.abbr.toLowerCase() === q);
-    if(stateMatches.length){
+    // 1) MERCADOS por nombre o por sigla de estado
+    const marketMatches = MARKETS.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      (m.states || []).some(s => s.toLowerCase() === q));
+    if(marketMatches.length){
       sections.push(`
         <div class="search-section">
-          <h3 class="search-section-title">States matching “${UI.escapeHtml(query)}”</h3>
+          <h3 class="search-section-title">Markets matching “${UI.escapeHtml(query)}”</h3>
           <div class="states-grid">
-            ${stateMatches.map(s => stateCard(
-                s.abbr, s.name, s.region, vendorsByState[s.abbr] || 0,
-                `market.html?state=${encodeURIComponent(s.abbr)}`
-              )).join("")}
+            ${marketMatches.map(m => marketCard(m, countByMarket[m.id] || 0,
+              `market.html?market=${encodeURIComponent(m.id)}`)).join("")}
           </div>
         </div>`);
     }
@@ -172,28 +177,21 @@
       matchedCats.forEach(c => c.services.forEach(s => svcSet.add(s)));
       const single = matchedCats.length === 1 ? matchedCats[0] : null;
 
-      // Usa el índice de db.js en vez de recorrer todos los vendors por estado.
-      const rows = STATES_LIST
-        .map(s => ({ s, cnt: DB.countVendorsInStateWithServices(s.abbr, svcSet) }))
+      const rows = MARKETS
+        .map(m => ({ m, cnt: DB.countVendorsInMarketWithServices(m.id, svcSet) }))
         .filter(r => r.cnt > 0)
-        .sort((a, b) => b.cnt - a.cnt || a.s.name.localeCompare(b.s.name));
+        .sort((a, b) => b.cnt - a.cnt || a.m.name.localeCompare(b.m.name));
 
       const label = matchedCats.map(c => c.name).join(", ");
-      let body;
-      if(rows.length === 0){
-        body = `<div class="empty-state"><div class="icon">🔍</div>
-          <h3>No vendors offer ${UI.escapeHtml(label)} yet</h3>
-          <p>As vendors register and add coverage, the markets where they operate will appear here.</p></div>`;
-      } else {
-        body = `<div class="states-grid">
-          ${rows.map(({s, cnt}) => {
-            const href = single
-              ? `category.html?state=${encodeURIComponent(s.abbr)}&cat=${encodeURIComponent(single.id)}`
-              : `market.html?state=${encodeURIComponent(s.abbr)}`;
-            return stateCard(s.abbr, s.name, s.region, cnt, href);
-          }).join("")}
-        </div>`;
-      }
+      const body = rows.length === 0
+        ? `<div class="empty-state"><div class="icon">🔍</div>
+             <h3>No vendors offer ${UI.escapeHtml(label)} yet</h3>
+             <p>As vendors register and add coverage, the markets where they operate will appear here.</p></div>`
+        : `<div class="states-grid">
+             ${rows.map(({m, cnt}) => marketCard(m, cnt, single
+                ? `category.html?market=${encodeURIComponent(m.id)}&cat=${encodeURIComponent(single.id)}`
+                : `market.html?market=${encodeURIComponent(m.id)}`)).join("")}
+           </div>`;
       sections.push(`
         <div class="search-section">
           <h3 class="search-section-title">Markets with “${UI.escapeHtml(label)}” vendors</h3>
@@ -201,45 +199,58 @@
         </div>`);
     }
 
-    // 3) CIUDADES (consulta de 3+ letras)
-    if(q.length >= 3){
-      const all = getCityIndex();
-      const exact = [];
-      const partial = [];
-      for(const h of all){
-        if(h.lower === q) exact.push(h);
-        else if(partial.length < 400 && h.lower.includes(q)) partial.push(h);
-      }
-      const useHits = (exact.length ? exact : partial).slice(0, 60);
+    // 3) CÓDIGO POSTAL exacto
+    if(/^\d{5}$/.test(q)){
+      const where = DB.lookupZip(q);
+      const inZip = DB.vendorsInZip(q);
+      const place = where.length
+        ? `${where[0].city}, ${where[0].state} · ${where[0].marketName}`
+        : "";
+      const body = inZip.length === 0
+        ? `<div class="empty-state"><div class="icon">📮</div>
+             <h3>No vendors cover ${UI.escapeHtml(q)} yet</h3>
+             <p>${where.length ? UI.escapeHtml(place) : "That ZIP code is not in any of our markets."}</p></div>`
+        : `<div class="vendor-list">${inZip.map(v => vendorRow(v, place)).join("")}</div>`;
+      sections.push(`
+        <div class="search-section">
+          <h3 class="search-section-title">Vendors covering ZIP ${UI.escapeHtml(q)}</h3>
+          ${body}
+        </div>`);
+    }
 
-      if(useHits.length){
-        const seenVendor = new Set();
-        const cityVendors = [];
-        // Solo miramos vendors de los estados implicados, no los 1.179.
-        const statesInvolved = Array.from(new Set(useHits.map(h => h.abbr)));
-        statesInvolved.forEach(abbr => {
-          DB.vendorsInState(abbr).forEach(v => {
-            if(seenVendor.has(v.id)) return;
-            const loc = useHits.find(h => h.abbr === abbr && DB.vendorCoversCity(v, h.abbr, h.county, h.city));
-            if(loc){ seenVendor.add(v.id); cityVendors.push({ v, loc }); }
+    // 4) CIUDADES (3+ letras)
+    else if(q.length >= 3){
+      const all = getCityIndex();
+      const exact = [], partial = [];
+      for(const r of all){
+        if(r.lower === q) exact.push(r);
+        else if(partial.length < 200 && r.lower.includes(q)) partial.push(r);
+      }
+      const hits = (exact.length ? exact : partial).slice(0, 40);
+
+      if(hits.length){
+        const zipSet = new Set();
+        hits.forEach(h => h.zips.forEach(z => zipSet.add(z)));
+
+        const seen = new Set();
+        const found = [];
+        zipSet.forEach(z => {
+          DB.vendorsInZip(z).forEach(v => {
+            if(seen.has(v.id)) return;
+            seen.add(v.id);
+            const h = hits.find(x => x.zips.indexOf(z) > -1);
+            found.push({ v, label: h ? `${h.city}, ${h.state}` : z });
           });
         });
 
         const cityName = exact.length ? exact[0].city : query.trim();
-        // Si no hay vendors en la ciudad, solo mostramos el aviso cuando la
-        // búsqueda apunta CLARAMENTE a una ciudad (sin coincidencias de
-        // estado ni de servicio); así evitamos secciones vacías redundantes.
-        const showCitySection = cityVendors.length > 0 ||
-          (stateMatches.length === 0 && matchedCats.length === 0);
-
-        if(showCitySection){
-          const body = cityVendors.length === 0
+        const show = found.length > 0 || (marketMatches.length === 0 && matchedCats.length === 0);
+        if(show){
+          const body = found.length === 0
             ? `<div class="empty-state"><div class="icon">📍</div>
                  <h3>No vendors cover ${UI.escapeHtml(cityName)} yet</h3>
-                 <p>No registered vendor lists this area in their coverage. Try a nearby city or a broader search.</p></div>`
-            : `<div class="vendor-list">
-                 ${cityVendors.map(({v, loc}) => vendorRow(v, `${loc.city}, ${loc.abbr}`)).join("")}
-               </div>`;
+                 <p>No registered vendor lists those ZIP codes. Try a nearby city or a broader search.</p></div>`
+            : `<div class="vendor-list">${found.map(f => vendorRow(f.v, f.label)).join("")}</div>`;
           sections.push(`
             <div class="search-section">
               <h3 class="search-section-title">Vendors available in “${UI.escapeHtml(cityName)}”</h3>
@@ -253,7 +264,8 @@
       searchResults.innerHTML = `<div class="empty-state">
         <div class="icon">🔎</div>
         <h3>No results for “${UI.escapeHtml(query)}”</h3>
-        <p>Try a state (Florida), a service (plumbing, electrical, HVAC) or a city (Ocala).</p>
+        <p>Try a market (Florida, Dallas), a service (plumbing, HVAC),
+           a city (Ocala) or a ZIP code (34470).</p>
       </div>`;
       return;
     }
@@ -265,28 +277,25 @@
     else renderSearch();
   }
 
-  // ─── Eventos ─────────────────────────────────────────
   const searchEl = document.getElementById("stateSearch");
   const runSearch = UI.debounce(render, 180);
-
   searchEl.addEventListener("input", e => {
     query = e.target.value;
-    // Volver a la vista por defecto es instantáneo; buscar espera al debounce.
     if(query.trim() === "") render();
     else runSearch();
   });
 
-  regionEl.querySelectorAll("button").forEach(btn => {
-    btn.addEventListener("click", () => {
-      regionEl.querySelectorAll("button").forEach(b => {
-        b.classList.remove("active");
-        b.setAttribute("aria-pressed", "false");
-      });
-      btn.classList.add("active");
-      btn.setAttribute("aria-pressed", "true");
-      regionFilter = btn.dataset.region;
-      if(query.trim() === "") renderDefault();
+  regionEl.addEventListener("click", e => {
+    const btn = e.target.closest("button[data-state]");
+    if(!btn) return;
+    regionEl.querySelectorAll("button").forEach(b => {
+      b.classList.remove("active");
+      b.setAttribute("aria-pressed", "false");
     });
+    btn.classList.add("active");
+    btn.setAttribute("aria-pressed", "true");
+    stateFilter = btn.dataset.state;
+    if(query.trim() === "") renderDefault();
   });
 
   render();

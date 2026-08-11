@@ -2161,3 +2161,127 @@ select:focus-visible,
   .admin-row-actions{ width: 100%; }
   .audit-time{ min-width: 0; }
 }
+
+/* =========================================================
+   SELECTOR DE CÓDIGOS POSTALES
+   Sustituye al mapa de EE. UU. y al árbol condado/ciudad.
+   ========================================================= */
+.zip-toolbar{
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
+}
+.zip-toolbar .search-box{ flex: 1; min-width: 220px; max-width: none; }
+.zip-toolbar .btn.active{ background: var(--cerulean); color: var(--white); border-color: var(--cerulean); }
+
+/* ---- Resumen de lo elegido ---- */
+.zip-summary{ display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.zip-summary-empty{
+  background: var(--eggshell-warm); border: 1px dashed var(--line);
+  border-radius: 10px; padding: 14px 16px; color: var(--muted); font-size: 14px; width: 100%;
+}
+.zip-chip{
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--powder-soft); border: 1px solid var(--powder);
+  color: var(--cerulean-dk); border-radius: 999px;
+  padding: 5px 6px 5px 12px; font-size: 13px; font-weight: 600;
+}
+.zip-chip strong{ font-weight: 800; }
+.zip-chip-x{
+  border: none; background: rgba(255,255,255,.7); color: var(--cerulean-dk);
+  width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
+  font-size: 12px; line-height: 1; display: flex; align-items: center; justify-content: center;
+}
+.zip-chip-x:hover{ background: var(--danger); color: var(--white); }
+
+/* ---- Árbol ---- */
+.zip-picker{
+  border: 1px solid var(--line); border-radius: 12px;
+  max-height: 560px; overflow-y: auto; background: var(--white);
+}
+.zip-empty{ padding: 32px; text-align: center; color: var(--muted); font-size: 14px; }
+
+.zip-market{ border-bottom: 1px solid var(--line); }
+.zip-market:last-child{ border-bottom: none; }
+.zip-market-head,
+.zip-county-head{ display: flex; align-items: center; gap: 8px; padding: 10px 14px; }
+.zip-market-head{ background: var(--eggshell-warm); }
+.zip-market-head:hover,
+.zip-county-head:hover{ background: var(--eggshell); }
+
+.zip-market-body,
+.zip-county-body{ display: none; }
+.zip-market.open > .zip-market-body,
+.zip-county.open > .zip-county-body{ display: block; }
+
+.zip-toggle{
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  font-size: 13px; padding: 2px 4px; transition: transform .15s;
+  transform: rotate(-90deg);
+}
+.zip-market.open > .zip-market-head .zip-toggle,
+.zip-county.open > .zip-county-head .zip-toggle{ transform: rotate(0deg); }
+
+.zip-check{
+  display: flex; align-items: center; gap: 9px; flex: 1;
+  cursor: pointer; user-select: none; min-width: 0;
+}
+.zip-name{
+  font-weight: 600; color: var(--ink); font-size: 14px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.zip-state{
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  letter-spacing: .06em; flex: none;
+}
+.zip-count{ font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+
+/* Casilla de tres estados: todo / parcial / nada */
+.zip-box{
+  flex: none; width: 18px; height: 18px; border-radius: 5px;
+  border: 2px solid var(--line); background: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: var(--white); line-height: 1;
+}
+.zip-box.checked{ background: var(--cerulean); border-color: var(--cerulean); }
+.zip-box.partial{ background: var(--powder); border-color: var(--cerulean); color: var(--cerulean-dk); }
+
+.zip-county{ border-top: 1px solid var(--line); }
+.zip-county-head{ padding-left: 30px; }
+
+.zip-city{ padding: 8px 14px 12px 52px; border-top: 1px dashed var(--line); }
+.zip-city .zip-check{ margin-bottom: 6px; }
+.zip-list{ display: flex; flex-wrap: wrap; gap: 5px; padding-left: 27px; }
+.zip-pill{
+  border: 1px solid var(--line); background: var(--white); color: var(--muted);
+  border-radius: 6px; padding: 3px 8px; cursor: pointer;
+  font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.zip-pill:hover{ border-color: var(--cerulean); color: var(--cerulean); }
+.zip-pill.selected{
+  background: var(--cerulean); border-color: var(--cerulean); color: var(--white);
+}
+
+/* ---- Cobertura en el perfil público ---- */
+.cov-county{
+  display: inline-block; background: var(--eggshell); border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px 11px; margin: 3px 4px 0 0;
+  font-size: 12px; color: var(--ink);
+}
+.cov-county em{ font-style: normal; color: var(--muted); font-weight: 600; }
+.cov-states{
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  letter-spacing: .06em; margin-left: 8px;
+}
+
+/* ---- Tarjeta de mercado en el directorio ---- */
+.market-name{
+  font-family: var(--serif); font-size: 19px; font-weight: 700;
+  color: var(--ink); line-height: 1.25; margin: 6px 0 2px;
+}
+.market-zips{ font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+
+@media (max-width: 720px){
+  .zip-city{ padding-left: 30px; }
+  .zip-list{ padding-left: 0; }
+  .zip-county-head{ padding-left: 20px; }
+}

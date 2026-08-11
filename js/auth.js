@@ -211,7 +211,7 @@ window.Auth = (function(){
       avatar: null,         // base64 o null
       licenses: [],         // documentos adjuntos
       services: [],         // nombres de servicio
-      coverage: {}          // { estado: { mode, counties } }
+      zips: []              // códigos postales que atiende (5 dígitos)
     } : {
       fullName: "",
       company: ""

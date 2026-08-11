@@ -1,0 +1,17 @@
+{
+  "name": "tools",
+  "version": "1.0.0",
+  "description": "",
+  "main": "set-admin.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "firebase-admin": "^14.2.0",
+    "google-auth-library": "^11.0.0"
+  }
+}

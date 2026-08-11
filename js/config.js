@@ -92,12 +92,17 @@ window.APP_CONFIG = {
      la config. Guía completa en FIREBASE.md
      ───────────────────────────────────────────────────────────────────── */
   FIREBASE: {
+    // Ponlo en true SOLO cuando js/db-firebase.js esté listo y probado.
+    // Mientras esté en false, la app sigue usando localStorage y todo
+    // funciona igual: cambiar el interruptor es el último paso, no el primero.
     ENABLED: false,
-    apiKey: "",
-    authDomain: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
+
+    apiKey:            "AIzaSyC47MYPTP0ImoYVeQskaZ1olxtBnQapTYQ",
+    authDomain:        "the-vendors-hub.firebaseapp.com",
+    projectId:         "the-vendors-hub",
+    storageBucket:     "the-vendors-hub.firebasestorage.app",
+    messagingSenderId: "140873702391",
+    appId:             "1:140873702391:web:51fdffba914697d4c66cf2",
+    measurementId:     "G-DDW5CDSSHN"   // Analytics: opcional, no lo usamos
   }
 };
