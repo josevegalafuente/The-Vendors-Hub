@@ -222,25 +222,15 @@
     }
   });
 
-  // ─── Licencias (barra lateral) ───────────────────────
-  const licenses = Array.isArray(p.licenses) ? p.licenses : [];
-  let licenseHtml = "";
-  if (p.license) licenseHtml += row("License #", UI.escapeHtml(p.license));
-  if (licenses.length) {
-    const chips = licenses.map(f => {
-      // Solo se enlaza si el adjunto es realmente un PDF o una imagen.
-      const src = UI.safeFileSrc(f.dataURL);
-      if (!src) return "";
-      const isPdf = src.indexOf("data:application/pdf") === 0;
-      return `<a class="file-chip" href="${UI.escapeHtml(src)}" target="_blank" rel="noopener noreferrer"
-                 download="${UI.escapeHtml(f.name)}">
-                <span class="file-ico">${isPdf ? "📄" : "🖼️"}</span>
-                <span class="file-name">${UI.escapeHtml(f.name)}</span>
-              </a>`;
-    }).join("");
-    if (chips) licenseHtml += `<div class="license-docs">${chips}</div>`;
-  }
-  $("#licenseBlock").innerHTML = licenseHtml || `<p class="about-text muted">No licenses on file.</p>`;
+  /* ─── Licencia (barra lateral) ───────────────────────
+     Solo el número. La subida de documentos se retiró: guardar copias de
+     licencias en el navegador significaba tener documentos identificativos
+     de terceros en base64, sin forma de borrarlos ni de controlar quién los
+     descarga. Verificar la licencia con el número es trabajo del
+     administrador, y el dato se comprueba en el registro oficial del estado. */
+  $("#licenseBlock").innerHTML = p.license
+    ? row("License #", UI.escapeHtml(p.license))
+    : `<p class="about-text muted">No license number on file.</p>`;
 
   // ─── Reseñas ─────────────────────────────────────────
   function renderReviews() {

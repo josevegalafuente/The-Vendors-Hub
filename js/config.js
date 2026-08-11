@@ -74,12 +74,9 @@ window.APP_CONFIG = {
      límites son conservadores hasta que Firebase Storage entre en juego.
      ───────────────────────────────────────────────────────────────────── */
   UPLOADS: {
-    MAX_LICENSE_BYTES: 700 * 1024,   // 700 KB por documento de licencia
-    MAX_LICENSE_FILES: 5,            // máximo de documentos por vendor
     MAX_AVATAR_BYTES: 4 * 1024 * 1024, // 4 MB antes de comprimir
     AVATAR_MAX_DIMENSION: 512,       // el avatar se reescala a 512 px máx.
     AVATAR_QUALITY: 0.82,            // calidad JPEG tras comprimir
-    ALLOWED_LICENSE_TYPES: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
     ALLOWED_IMAGE_TYPES: ["image/jpeg", "image/png", "image/webp", "image/gif"]
   },
 

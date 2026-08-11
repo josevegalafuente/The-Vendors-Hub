@@ -23,7 +23,6 @@
   // se ejecuta antes que el selector de ZIP y ya la necesita.
   const selectedZips = new Set(Array.isArray(profile.zips) ? profile.zips : []);
   let avatar = profile.avatar || null;
-  let licenses = Array.isArray(profile.licenses) ? profile.licenses.slice() : [];
 
   // ─── Campos de texto ─────────────────────────────────
   const FIELD_IDS = ["businessName","contactName","addressLine","city","state","zip",
@@ -157,82 +156,6 @@
     e.target.value = "";
   }
   paintAvatar();
-
-  /* =====================================================================
-     DOCUMENTOS DE LICENCIA
-     ===================================================================== */
-  const MAX_LICENSE_BYTES = UP.MAX_LICENSE_BYTES || 700 * 1024;
-  const MAX_LICENSE_FILES = UP.MAX_LICENSE_FILES || 5;
-  const ALLOWED_LICENSE_TYPES = UP.ALLOWED_LICENSE_TYPES ||
-    ["application/pdf", "image/jpeg", "image/png", "image/webp"];
-
-  function renderLicenses(){
-    const list = $("#licensesList");
-    if(licenses.length === 0){ list.innerHTML = ""; return; }
-
-    list.innerHTML = licenses.map((f, i) => {
-      const src = UI.safeFileSrc(f.dataURL);
-      const isPdf = !!src && src.indexOf("data:application/pdf") === 0;
-      const nameHtml = UI.escapeHtml(f.name);
-      // Si el adjunto no supera la validación, se muestra sin enlace.
-      const label = src
-        ? `<a class="file-name" href="${UI.escapeHtml(src)}" target="_blank" rel="noopener noreferrer"
-              download="${nameHtml}">${nameHtml}</a>`
-        : `<span class="file-name">${nameHtml}</span>`;
-      return `
-        <div class="file-chip">
-          <span class="file-ico">${isPdf ? "📄" : "🖼️"}</span>
-          ${label}
-          <button type="button" class="file-remove" data-index="${i}" title="Remove" aria-label="Remove ${nameHtml}">✕</button>
-        </div>`;
-    }).join("");
-
-    list.querySelectorAll(".file-remove").forEach(btn => {
-      btn.addEventListener("click", () => {
-        licenses.splice(Number(btn.dataset.index), 1);
-        renderLicenses();
-      });
-    });
-  }
-
-  $("#licenseDrop").addEventListener("click", () => $("#licenseFile").click());
-
-  $("#licenseFile").addEventListener("change", async e => {
-    const file = e.target.files[0];
-    if(!file) return;
-    e.target.value = "";   // permite volver a subir el mismo archivo
-
-    if(licenses.length >= MAX_LICENSE_FILES){
-      UI.showToast(`You can attach up to ${MAX_LICENSE_FILES} documents.`, "error");
-      return;
-    }
-    if(ALLOWED_LICENSE_TYPES.indexOf(file.type) === -1){
-      UI.showToast("Only PDF, JPG, PNG or WebP files are allowed.", "error");
-      return;
-    }
-    if(file.size > MAX_LICENSE_BYTES){
-      const kb = Math.round(MAX_LICENSE_BYTES / 1024);
-      UI.showToast(`That file is larger than ${kb} KB. Please use a smaller file.`, "error");
-      return;
-    }
-
-    try{
-      let dataURL;
-      if(file.type === "application/pdf"){
-        dataURL = await UI.readFileAsDataURL(file);
-      } else {
-        // Las imágenes se comprimen: una foto del carnet no necesita 3 MB.
-        dataURL = await UI.compressImage(file, 1400, 0.8);
-      }
-      licenses.push({ name: file.name.slice(0, 120), type: file.type, dataURL, addedAt: Date.now() });
-      renderLicenses();
-      UI.showToast("Document attached. Remember to save your profile.", "success");
-    }catch(err){
-      console.error(err);
-      UI.showToast("Could not read that file.", "error");
-    }
-  });
-  renderLicenses();
 
   /* =====================================================================
      SERVICIOS
@@ -585,7 +508,6 @@
     saving = true;
     const profilePatch = Object.assign({}, updates, {
       avatar,
-      licenses,
       services: Array.from(selectedServices),
       zips: Array.from(selectedZips).sort()
     });

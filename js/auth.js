@@ -209,7 +209,6 @@ window.Auth = (function(){
       zip: "", phone: "", website: "", about: "", yearsActive: "", employees: "",
       license: "", vendorMeldName: "",
       avatar: null,         // base64 o null
-      licenses: [],         // documentos adjuntos
       services: [],         // nombres de servicio
       zips: []              // códigos postales que atiende (5 dígitos)
     } : {

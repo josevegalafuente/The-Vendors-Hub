@@ -50,7 +50,7 @@ window.DB = (function () {
     schema:   "tvh_schema"     // versión del esquema de datos
   };
 
-  const SCHEMA_VERSION = 3;
+  const SCHEMA_VERSION = 4;
 
   /* =======================================================================
      HELPERS DE BAJO NIVEL
@@ -521,7 +521,7 @@ window.DB = (function () {
         state: (l.states && l.states[0]) || "",
         zip: "", phone: "", website: "", about: "",
         yearsActive: "", employees: "", license: "",
-        licenses: [], avatar: null,
+        avatar: null,
         services: l.services || [],
         zips: l.zips || []
       }
@@ -1036,6 +1036,33 @@ window.DB = (function () {
         let changed = false;
         listings.forEach(l => {
           if (l && l.coverage) { delete l.coverage; changed = true; }
+        });
+        return changed ? listings : undefined;
+      });
+    }
+
+    /* v3 → v4: se retira la subida de documentos de licencia.
+
+       Los archivos ya guardados se BORRAN, no se dejan ahí. Eran documentos
+       identificativos de terceros en base64 dentro del navegador, y al quitar
+       la interfaz nadie tendría forma de eliminarlos: quedarían ocupando la
+       cuota para siempre y sin control sobre quién los descarga. El número de
+       licencia, que es el dato que sirve para verificar, se conserva. */
+    if (from < 4) {
+      mutate(KEYS.users, [], users => {
+        let changed = false;
+        users.forEach(u => {
+          if (u && u.profile && u.profile.licenses !== undefined) {
+            delete u.profile.licenses;
+            changed = true;
+          }
+        });
+        return changed ? users : undefined;
+      });
+      mutate(KEYS.listings, [], listings => {
+        let changed = false;
+        listings.forEach(l => {
+          if (l && l.licenses !== undefined) { delete l.licenses; changed = true; }
         });
         return changed ? listings : undefined;
       });
