@@ -9,6 +9,7 @@
 
    USO:  cd tools && node verify-rules.js
    ========================================================================= */
+const fs = require("fs");
 const path = require("path");
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
@@ -17,8 +18,25 @@ const KEY_FILE = path.join(__dirname, "firebase-service-account.json");
 const key = require(KEY_FILE);
 const PROJECT = key.project_id;
 
-// La API key web es pública (va en el HTML del sitio).
-const API_KEY = "AIzaSyC47MYPTP0ImoYVeQskaZ1olxtBnQapTYQ";
+/* La clave web se LEE de js/config.js en vez de duplicarla aquí.
+
+   Es pública por diseño —Firebase la sirve en el HTML de cualquier sitio que
+   lo use, y quien protege los datos son las reglas de firestore.rules, no
+   ocultarla—, pero tenerla escrita en dos archivos tiene dos problemas:
+   al rotarla habría que acordarse de los dos sitios, y el escáner de secretos
+   de GitHub la marca (no puede distinguir una clave web de Firebase de una
+   clave de servidor con facturación asociada). Con una sola fuente, ninguno
+   de los dos problemas existe. */
+const API_KEY = (function () {
+  const win = {};
+  new Function("window", fs.readFileSync(path.join(__dirname, "..", "js", "config.js"), "utf8"))(win);
+  const key = win.APP_CONFIG && win.APP_CONFIG.FIREBASE && win.APP_CONFIG.FIREBASE.apiKey;
+  if (!key) {
+    console.error("\n❌ No hay apiKey en js/config.js → FIREBASE.apiKey\n");
+    process.exit(1);
+  }
+  return key;
+})();
 const FS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
 initializeApp({ credential: cert(key) });
