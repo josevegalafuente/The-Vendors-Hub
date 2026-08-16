@@ -50,7 +50,7 @@ window.DB = (function () {
     schema:   "tvh_schema"     // versión del esquema de datos
   };
 
-  const SCHEMA_VERSION = 4;
+  const SCHEMA_VERSION = 5;
 
   /* =======================================================================
      HELPERS DE BAJO NIVEL
@@ -378,7 +378,29 @@ window.DB = (function () {
     return _zipIndex;
   }
 
-  function lookupZip(zip) { return zipIndex().get(String(zip).trim()) || []; }
+  /* Busca un código. Acepta el código completo tal cual ("36067-6627") o solo
+     el prefijo de 5 dígitos ("36067"), que devuelve todos los que empiezan
+     por él. El Excel usa los dos formatos, y nadie recuerda el sufijo de
+     cuatro cifras al buscar. */
+  function lookupZip(zip) {
+    const q = String(zip).trim();
+    const exact = zipIndex().get(q);
+    if (exact) return exact;
+    if (!/^\d{5}$/.test(q)) return [];
+    const out = [];
+    zipIndex().forEach((entries, code) => {
+      if (code.slice(0, 5) === q) out.push.apply(out, entries);
+    });
+    return out;
+  }
+
+  /* Todos los códigos que empiezan por ese prefijo de 5 dígitos. */
+  function zipsWithPrefix(prefix) {
+    const p = String(prefix).trim();
+    const out = [];
+    zipIndex().forEach((entries, code) => { if (code.slice(0, 5) === p) out.push(code); });
+    return out;
+  }
 
   /* Todos los ZIP de los mercados que tocan un estado. Se usa para convertir
      la cobertura antigua ("cubre todo Florida") al modelo nuevo. */
@@ -396,10 +418,47 @@ window.DB = (function () {
     return Array.from(new Set(out));
   }
 
-  /* Lista de ZIP de un vendor, tolerante con perfiles a medio migrar. */
+  /* =======================================================================
+     CÓMO SE EXPRESA LA COBERTURA
+     -----------------------------------------------------------------------
+     Hay DOS formas, y conviven a propósito:
+
+       profile.zips        códigos concretos que el vendor eligió
+       profile.coverStates estados enteros ("cubro toda Alabama")
+
+     Las fichas importadas usan la segunda. El motivo no es de comodidad sino
+     de límites duros: al pasar a códigos completos, expandir "Alabama" a su
+     lista da hasta 14.154 códigos por ficha. Un trozo de Firestore llegaba a
+     11 MB (el máximo por documento es 1 MB) y en localStorage sumaba ~27 MB
+     contra un tope de 5 MB.
+
+     Además es más fiel al origen: el informe dice que ese vendor atiende
+     Alabama, no que atienda esos 14.154 códigos uno por uno. La expansión se
+     hace al comparar, no al guardar.
+     ===================================================================== */
   function vendorZips(vendor) {
     const p = (vendor && vendor.profile) || {};
     return Array.isArray(p.zips) ? p.zips : [];
+  }
+
+  function vendorStates(vendor) {
+    const p = (vendor && vendor.profile) || {};
+    return Array.isArray(p.coverStates) ? p.coverStates : [];
+  }
+
+  /* Estado al que pertenece un código. Acepta el código completo
+     ("36067-6627") o solo el prefijo de 5 dígitos ("36067"), porque las dos
+     formas circulan: el Excel usa ambas y la gente busca por el prefijo. */
+  function stateOfZip(zip) {
+    const q = String(zip).trim();
+    const exact = zipIndex().get(q);
+    if (exact && exact.length) return exact[0].state;
+    if (!/^\d{5}$/.test(q)) return null;
+    let found = null;
+    zipIndex().forEach((entries, code) => {
+      if (!found && code.slice(0, 5) === q && entries.length) found = entries[0].state;
+    });
+    return found;
   }
 
   /* Sincroniza data/vendors-data.js con el almacenamiento local.
@@ -425,13 +484,11 @@ window.DB = (function () {
         const ref = String(item.ref || "").trim();
         if (!ref) return;
 
+        // La ficha importada solo trae ESTADOS, y así se guarda. Expandirla a
+        // la lista de códigos daba hasta 14.154 por ficha y reventaba tanto el
+        // límite de 1 MB por documento de Firestore como los 5 MB de
+        // localStorage. La expansión se hace al comparar, no al guardar.
         const states = Array.isArray(item.states) ? item.states : [];
-        // La ficha importada solo trae estados. Su cobertura pasa a ser todos
-        // los ZIP que la empresa gestiona en esos estados: es lo más fiel que
-        // se puede deducir hasta que el vendor afine su propia selección.
-        const zips = [];
-        states.forEach(s => { zips.push.apply(zips, zipsForState(s)); });
-        const zipList = Array.from(new Set(zips)).sort();
 
         const existing = byRef.get(ref);
         const email = normalizeEmail(contacts[ref] || (existing && existing.email) || "");
@@ -447,9 +504,9 @@ window.DB = (function () {
           // La cobertura y los servicios solo se regeneran si el vendor aún
           // no ha reclamado la ficha (si la reclamó, manda su propio perfil).
           if (!existing.claimedBy) {
-            existing.zips = zipList;
             existing.services = servicesForCategory(item.cat);
             delete existing.coverage;      // modelo antiguo
+            delete existing.zips;          // se derivaba de los estados
           }
           if (JSON.stringify([existing.name, existing.cat, existing.states, existing.email]) !== before) changes++;
           next.push(existing);
@@ -461,7 +518,6 @@ window.DB = (function () {
             meld: item.meld || item.name || "",
             cat: item.cat || "",
             states,
-            zips: zipList,
             services: servicesForCategory(item.cat),
             email: email || null,
             claimedBy: null,      // id de la cuenta que reclamó esta ficha
@@ -523,7 +579,8 @@ window.DB = (function () {
         yearsActive: "", employees: "", license: "",
         avatar: null,
         services: l.services || [],
-        zips: l.zips || []
+        zips: [],                       // sin códigos concretos
+        coverStates: l.states || []     // cubre estos estados enteros
       }
     };
   }
@@ -577,19 +634,35 @@ window.DB = (function () {
     const byId = new Map();
 
     // ZIP -> mercados a los que pertenece (un ZIP puede tocar dos mercados)
+    const ms = allMarkets();
     const zipToMarkets = new Map();
     zipIndex().forEach((entries, z) => {
       zipToMarkets.set(z, Array.from(new Set(entries.map(e => e.marketId))));
     });
 
+    /* Los vendors que cubren estados enteros NO se meten en byZip: serían
+       14.154 entradas por ficha y 1.179 fichas. Se guardan aparte, por estado,
+       y vendorsInZip() une los dos conjuntos al consultar. */
+    const byState = new Map();
+
     vendors.forEach(v => {
       byId.set(v.id, v);
       const seenMarkets = new Set();
+
       vendorZips(v).forEach(z => {
         if (!byZip.has(z)) byZip.set(z, []);
         byZip.get(z).push(v);
         (zipToMarkets.get(z) || []).forEach(mid => seenMarkets.add(mid));
       });
+
+      vendorStates(v).forEach(st => {
+        if (!byState.has(st)) byState.set(st, []);
+        byState.get(st).push(v);
+        Object.keys(ms).forEach(mid => {
+          if ((ms[mid].states || []).indexOf(st) > -1) seenMarkets.add(mid);
+        });
+      });
+
       seenMarkets.forEach(mid => {
         if (!byMarket.has(mid)) byMarket.set(mid, []);
         byMarket.get(mid).push(v);
@@ -600,14 +673,26 @@ window.DB = (function () {
       });
     });
 
-    indexes = { vendors, byMarket, byZip, byService, byId };
+    indexes = { vendors, byMarket, byZip, byState, byService, byId };
     return indexes;
   }
 
   function idx() { return indexes || buildIndexes(); }
 
   function vendorsInMarket(marketId) { return idx().byMarket.get(marketId) || []; }
-  function vendorsInZip(zip)         { return idx().byZip.get(String(zip).trim()) || []; }
+  function vendorsInZip(zip) {
+    const q = String(zip).trim();
+    const out = (idx().byZip.get(q) || []).slice();
+    const seen = new Set(out.map(v => v.id));
+    // Más los que cubren el estado entero de ese código.
+    const st = stateOfZip(q);
+    if (st) {
+      (idx().byState.get(st) || []).forEach(v => {
+        if (!seen.has(v.id)) { seen.add(v.id); out.push(v); }
+      });
+    }
+    return out;
+  }
 
   /* Cuenta vendors de un mercado que ofrecen alguno de esos servicios. */
   function countVendorsInMarketWithServices(marketId, serviceSet) {
@@ -628,14 +713,26 @@ window.DB = (function () {
 
   /* ¿Este vendor atiende este código postal? Una búsqueda en un conjunto. */
   function vendorCoversZip(vendor, zip) {
-    return vendorZips(vendor).indexOf(String(zip).trim()) > -1;
+    const q = String(zip).trim();
+    const own = vendorZips(vendor);
+    if (own.indexOf(q) > -1) return true;
+    // Un prefijo de 5 dígitos cuenta si el vendor cubre cualquier código suyo.
+    if (/^\d{5}$/.test(q) && own.some(z => z.slice(0, 5) === q)) return true;
+    // O si cubre el estado entero al que pertenece ese código.
+    const st = stateOfZip(q);
+    return !!st && vendorStates(vendor).indexOf(st) > -1;
   }
 
   /* ¿Cubre algo de este mercado? */
   function vendorCoversMarket(vendor, marketId) {
-    const mz = marketZips(marketId);
+    const m = allMarkets()[marketId];
+    if (!m) return false;
+    // Por estados: basta con que el mercado toque uno de los suyos.
+    const states = vendorStates(vendor);
+    if (states.length && (m.states || []).some(st => states.indexOf(st) > -1)) return true;
     const own = new Set(vendorZips(vendor));
-    for (const z of mz) { if (own.has(z)) return true; }
+    if (!own.size) return false;
+    for (const z of marketZips(marketId)) { if (own.has(z)) return true; }
     return false;
   }
 
@@ -643,7 +740,8 @@ window.DB = (function () {
      [{ marketId, marketName, states, covered, total, counties:{…} }] */
   function coverageSummary(vendor) {
     const own = new Set(vendorZips(vendor));
-    if (own.size === 0) return [];
+    const states = vendorStates(vendor);
+    if (own.size === 0 && states.length === 0) return [];
     const out = [];
     const ms = allMarkets();
     Object.keys(ms).forEach(mid => {
@@ -661,9 +759,10 @@ window.DB = (function () {
         const hit = new Set();
         const all = new Set();
         Object.keys(info.cities).forEach(city => {
+          const wholeState = states.indexOf(info.state) > -1;
           info.cities[city].forEach(z => {
             all.add(z); marketAll.add(z);
-            if (own.has(z)) { hit.add(z); marketHit.add(z); }
+            if (wholeState || own.has(z)) { hit.add(z); marketHit.add(z); }
           });
         });
         if (hit.size) {
@@ -751,7 +850,9 @@ window.DB = (function () {
       ["About / description",        !!String(p.about || "").trim()],
       ["License number",             !!String(p.license || "").trim()],
       ["At least one service",       Array.isArray(p.services) && p.services.length > 0],
-      ["At least one coverage ZIP code", Array.isArray(p.zips) && p.zips.length > 0]
+      ["At least one coverage ZIP code",
+        (Array.isArray(p.zips) && p.zips.length > 0) ||
+        (Array.isArray(p.coverStates) && p.coverStates.length > 0)]
     ];
     const missing = checks.filter(c => !c[1]).map(c => c[0]);
     return {
@@ -915,7 +1016,6 @@ window.DB = (function () {
       {
         ref: "demo-bluewave-plumbing", name: "BlueWave Plumbing Co.",
         meld: "BlueWave Plumbing", cat: "plumbing", states: ["FL"],
-        zips: ["33125", "33126", "33127", "33301", "33304"],
         services: ["Plumbing", "Drain Cleaning", "Water Damage Restoration"],
         email: null, claimedBy: null, hidden: false, createdAt: Date.now(),
         reviews: [
@@ -926,7 +1026,6 @@ window.DB = (function () {
       {
         ref: "demo-summit-electric", name: "Summit Electric",
         meld: "Summit Electric", cat: "electrical", states: ["AZ"],
-        zips: ["85008", "85015", "85032", "85086", "85323"],
         services: ["Electrical", "Lighting Installation", "EV Charging Installation", "Generator Installation"],
         email: null, claimedBy: null, hidden: false, createdAt: Date.now(),
         reviews: [
@@ -936,7 +1035,6 @@ window.DB = (function () {
       {
         ref: "demo-ocala-comfort", name: "Ocala Comfort HVAC",
         meld: "Ocala Comfort HVAC", cat: "hvac", states: ["FL"],
-        zips: ["34470", "34471", "34472", "34474", "34475"],
         services: ["HVAC Installation", "HVAC Repair & Maintenance", "Duct Cleaning"],
         email: null, claimedBy: null, hidden: false, createdAt: Date.now(),
         reviews: [
@@ -1068,6 +1166,41 @@ window.DB = (function () {
       });
     }
 
+    /* v4 → v5: los códigos dejan de recortarse a 5 dígitos y pasan a
+       guardarse tal cual están en el informe ("36067-6627").
+
+       La cobertura ya guardada está en el formato viejo. Cada código de 5
+       dígitos se sustituye por TODOS los códigos completos que empiezan por
+       él: el vendor que cubría 36067 sigue cubriendo exactamente la misma
+       zona, ahora expresada con el detalle que usa la empresa. */
+    if (from < 5) {
+      mutate(KEYS.users, [], users => {
+        let changed = false;
+        users.forEach(u => {
+          const p = u && u.profile;
+          if (!p || !Array.isArray(p.zips) || !p.zips.length) return;
+          const out = new Set();
+          p.zips.forEach(z => {
+            if (/^\d{5}$/.test(z)) zipsWithPrefix(z).forEach(full => out.add(full));
+            else out.add(z);
+          });
+          const next = Array.from(out).sort();
+          if (next.join() !== p.zips.join()) { p.zips = next; changed = true; }
+        });
+        return changed ? users : undefined;
+      });
+
+      // Las fichas del directorio las regenera syncDirectory() con el formato
+      // nuevo; se limpian aquí para que no queden dos formatos mezclados.
+      /* Las fichas guardaban la lista expandida de códigos. Se borra: ahora
+         la cobertura sale de sus estados y se expande solo al comparar. */
+      mutate(KEYS.listings, [], listings => {
+        let changed = false;
+        listings.forEach(l => { if (l && l.zips !== undefined) { delete l.zips; changed = true; } });
+        return changed ? listings : undefined;
+      });
+    }
+
     if (from !== SCHEMA_VERSION) write(KEYS.schema, SCHEMA_VERSION);
   }
 
@@ -1131,10 +1264,12 @@ window.DB = (function () {
     // mercados y códigos postales
     getMarkets, getMarket, marketZips, lookupZip, zipsForState, vendorZips,
     vendorCoversZip, vendorCoversMarket, coverageSummary,
+    vendorStates, stateOfZip,
     // directorio
     getListings, getListingByRef, updateListing, syncDirectory,
     // índices / búsqueda
     vendorsInMarket, vendorsInZip, countVendorsInMarketWithServices, countVendorsByMarket,
+    zipsWithPrefix,
     // reseñas
     addOrUpdateReview, getReviews, getRatingSummary,
     // reclamaciones

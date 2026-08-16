@@ -2,6 +2,9 @@
 """
 Genera data/markets.js a partir de 'Updated City_County Unit List.xlsx'.
 
+Los códigos postales se copian TAL CUAL están en cada celda: si el informe
+dice 36067-6627, eso es lo que ve el vendor. No se recortan ni se agrupan.
+
 DETECCIÓN DE NIVELES — se explica en detalle porque no es obvia:
 El Excel no tiene indentación, columnas de nivel ni nada que marque la
 jerarquía. Adivinar por el texto falla:
@@ -50,7 +53,13 @@ def norm(v):
     return s[:-2] if s.endswith(".0") else s
 
 def is_zip(t):   return bool(ZIP_RE.match(t))
-def zip5(t):     return ZIP_RE.match(t).group(1)
+
+# El código se guarda EXACTAMENTE como está en la celda. Antes se recortaba a
+# 5 dígitos ("36067-6627" -> "36067") para tener menos opciones que elegir,
+# pero eso perdía información que el informe sí distingue: Prattville aparece
+# como 36067-6627, no como 36067. Ahora se respeta la celda literal, y conviven
+# los dos formatos porque el Excel mismo usa los dos.
+def zip_raw(t):  return t.strip()
 def is_count(t): return bool(re.fullmatch(r"[\d.,]+", t)) and not is_zip(t)
 def is_county(t):
     return t.endswith(" County") or t.endswith(" Parish") or t.endswith(" city")
@@ -199,7 +208,7 @@ for sheet in wb.sheetnames:
 
             elif k == "zip":
                 if mkey and county and city:
-                    markets[mkey]["counties"][county]["cities"][city].add(zip5(t))
+                    markets[mkey]["counties"][county]["cities"][city].add(zip_raw(t))
                 else:
                     anomalies.append(
                         f"{sheet}: ZIP {t} huérfano "

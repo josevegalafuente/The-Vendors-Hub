@@ -2285,3 +2285,21 @@ select:focus-visible,
   .zip-list{ padding-left: 0; }
   .zip-county-head{ padding-left: 20px; }
 }
+
+/* ---- Fila de ciudad plegable dentro del selector de códigos ----
+   Necesaria al pasar a códigos completos: hay ciudades con 393 códigos. */
+.zip-city{ padding: 0; border-top: 1px dashed var(--line); }
+.zip-city-head{
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px 8px 46px;
+}
+.zip-city-head:hover{ background: var(--eggshell-warm); }
+.zip-city .zip-list{ display: none; padding: 2px 14px 12px 76px; }
+.zip-city.open > .zip-list{ display: flex; }
+.zip-city.open > .zip-city-head .zip-toggle{ transform: rotate(0deg); }
+.zip-city .zip-name{ font-weight: 500; }
+
+@media (max-width: 720px){
+  .zip-city-head{ padding-left: 24px; }
+  .zip-city .zip-list{ padding-left: 24px; }
+}

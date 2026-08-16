@@ -213,6 +213,7 @@
      ===================================================================== */
   const openMarkets = new Set();     // mercados desplegados
   const openCounties = new Set();    // condados desplegados
+  const openCities = new Set();      // ciudades desplegadas
   let zipQuery = "";
   let onlySelected = false;
 
@@ -230,7 +231,11 @@
           rows.push({
             marketId: m.id, county: cty, city,
             zips: info.cities[city],
-            hay: (m.name + " " + cty + " " + city + " " + info.cities[city].join(" ")).toLowerCase()
+            /* El texto de búsqueda lleva el código completo Y su prefijo de
+               5 dígitos, para que escribir "36067" encuentre "36067-6627".
+               Nadie recuerda el sufijo de cuatro cifras. */
+            hay: (m.name + " " + cty + " " + city + " " + info.cities[city].join(" ") + " " +
+                  info.cities[city].map(z => z.slice(0, 5)).join(" ")).toLowerCase()
           });
         });
       });
@@ -338,21 +343,33 @@
                   <div class="zip-county-body">
                     ${counties.get(cty).sort((a,b) => a.city.localeCompare(b.city)).map(r => {
                       const rState = tri(r.zips);
+                      const cityKey = m.id + "||" + cty + "||" + r.city;
+                      /* Los códigos de una ciudad van PLEGADOS por defecto.
+                         Al pasar a códigos completos hay ciudades con 393
+                         (San Antonio) y condados con 511 (Dallas): pintarlos
+                         todos de golpe entierra la jerarquía y hace el
+                         desplazamiento pesadísimo. Se abren al pulsar. */
+                      const cityOpen = openCities.has(cityKey) || (!!q && r.zips.length <= 40);
                       return `
-                        <div class="zip-city">
-                          <label class="zip-check" data-action="pick-city"
-                                 data-market="${UI.escapeHtml(m.id)}" data-county="${UI.escapeHtml(cty)}"
-                                 data-city="${UI.escapeHtml(r.city)}"
-                                 role="checkbox" tabindex="0" aria-checked="${rState === "all"}">
-                            ${boxHtml(rState)}
-                            <span class="zip-name">${UI.escapeHtml(r.city)}</span>
-                          </label>
+                        <div class="zip-city ${cityOpen ? "open" : ""}">
+                          <div class="zip-city-head">
+                            <button type="button" class="zip-toggle" data-action="toggle-city"
+                                    data-key="${UI.escapeHtml(cityKey)}" aria-expanded="${cityOpen}">▾</button>
+                            <label class="zip-check" data-action="pick-city"
+                                   data-market="${UI.escapeHtml(m.id)}" data-county="${UI.escapeHtml(cty)}"
+                                   data-city="${UI.escapeHtml(r.city)}"
+                                   role="checkbox" tabindex="0" aria-checked="${rState === "all"}">
+                              ${boxHtml(rState)}
+                              <span class="zip-name">${UI.escapeHtml(r.city)}</span>
+                            </label>
+                            <span class="zip-count">${countSelected(r.zips)} / ${r.zips.length}</span>
+                          </div>
                           <div class="zip-list">
-                            ${r.zips.map(z => `
+                            ${cityOpen ? r.zips.map(z => `
                               <button type="button" class="zip-pill ${selectedZips.has(z) ? "selected" : ""}"
                                       data-action="pick-zip" data-zip="${UI.escapeHtml(z)}"
                                       aria-pressed="${selectedZips.has(z)}">${UI.escapeHtml(z)}</button>
-                            `).join("")}
+                            `).join("") : ""}
                           </div>
                         </div>`;
                     }).join("")}
@@ -390,6 +407,11 @@
       renderZipPicker();
       return;
     }
+    if (action === "toggle-city"){
+      if (openCities.has(key)) openCities.delete(key); else openCities.add(key);
+      renderZipPicker();
+      return;
+    }
 
     if (action === "pick-market"){
       const list = zipsOfMarket(market);
@@ -403,6 +425,7 @@
       const m = DB.getMarket(market);
       const list = (m && m.counties[county] && m.counties[county].cities[city]) || [];
       setZips(list, tri(list) !== "all");
+      openCities.add(market + "||" + county + "||" + city);
     } else if (action === "pick-zip"){
       if (selectedZips.has(zip)) selectedZips.delete(zip); else selectedZips.add(zip);
     }

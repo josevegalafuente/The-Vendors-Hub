@@ -68,32 +68,20 @@ function servicesForCategory(catId) {
   return c ? c.services.slice() : [];
 }
 
-/* Todos los ZIP que la empresa gestiona en un estado. La ficha importada solo
-   trae estados, así que su cobertura inicial son todos los ZIP de ese estado;
-   el vendor la afina luego desde su perfil. */
-function zipsForState(abbr) {
-  const out = [];
-  Object.values(markets).forEach(m => {
-    Object.values(m.counties).forEach(info => {
-      if (info.state !== abbr) return;
-      Object.values(info.cities).forEach(list => out.push(...list));
-    });
-  });
-  return Array.from(new Set(out));
-}
+/* La ficha importada guarda los ESTADOS que atiende, no la lista expandida de
+   códigos. Expandirla daba hasta 14.154 códigos por ficha: un trozo llegaba a
+   11 MB y el máximo por documento de Firestore es 1 MB. La expansión se hace
+   al comparar, en el cliente. */
 
 /* ---------- 2. Construir los documentos ---------- */
 const items = vendors.map(v => {
   const states = Array.isArray(v.states) ? v.states : [];
-  const zips = [];
-  states.forEach(s => zips.push(...zipsForState(s)));
   return {
     ref: v.ref,
     name: v.name || "",
     meld: v.meld || v.name || "",
     cat: v.cat || "",
     states,
-    zips: Array.from(new Set(zips)).sort(),
     services: servicesForCategory(v.cat),
     email: (contacts[v.ref] || "").trim().toLowerCase() || null,
     claimedBy: null,
