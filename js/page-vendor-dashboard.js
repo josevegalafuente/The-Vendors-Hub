@@ -2,7 +2,12 @@
    page-vendor-dashboard.js — editor del perfil del vendor, con cobertura
    jerárquica: Estado → Condados → Ciudades.
    ========================================================================= */
-(function(){
+/* Espera a que la capa de datos esté lista antes de pintar. Con localStorage
+   la promesa ya viene resuelta y no cambia nada; con Firestore da tiempo a
+   cargar la sesión y el directorio. Si la carga falla, se pinta igual con lo
+   que haya en lugar de dejar la página en blanco. */
+DB.ready.catch(function(){}).then(function(){
+
   const user = Auth.requireRole("vendor", "auth.html?role=vendor");
   if(!user) return;
 
@@ -569,4 +574,4 @@
     e.preventDefault();
     e.returnValue = "";
   });
-})();
+});

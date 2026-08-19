@@ -4,7 +4,12 @@
    Regla: un property manager solo deja UNA reseña por vendor (la edita si
    vuelve a calificar).
    ========================================================================= */
-(function () {
+/* Espera a que la capa de datos esté lista antes de pintar. Con localStorage
+   la promesa ya viene resuelta y no cambia nada; con Firestore da tiempo a
+   cargar la sesión y el directorio. Si la carga falla, se pinta igual con lo
+   que haya en lugar de dejar la página en blanco. */
+DB.ready.catch(function(){}).then(function(){
+
   const user = DB.getCurrentUser();
   if (!user) { window.location.replace("auth.html"); return; }
 
@@ -326,4 +331,4 @@
       }
     });
   }
-})();
+});

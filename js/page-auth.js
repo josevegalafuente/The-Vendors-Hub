@@ -1,7 +1,12 @@
 /* =========================================================================
    page-auth.js — pestañas de acceso / registro, selección de rol y envío.
    ========================================================================= */
-(function(){
+/* Espera a que la capa de datos esté lista antes de pintar. Con localStorage
+   la promesa ya viene resuelta y no cambia nada; con Firestore da tiempo a
+   cargar la sesión y el directorio. Si la carga falla, se pinta igual con lo
+   que haya en lugar de dejar la página en blanco. */
+DB.ready.catch(function(){}).then(function(){
+
   // ¿Ya tiene sesión? Lo mandamos a su panel.
   // Solo si el rol es VÁLIDO; si la sesión trae un rol corrupto, la limpiamos
   // y dejamos que inicie sesión de nuevo (así no se genera un bucle con las
@@ -183,12 +188,26 @@
         const result = await Auth.register({ email, password, role });
         if(!result.ok){ showAlert(result.error); return; }
 
+        /* Con Firebase hay que confirmar el correo antes de entrar. No es un
+           trámite: sin él, cualquiera podría registrarse con un correo
+           @purehomeriver.com que no es suyo y quedar como Property Manager. */
+        if(result.needsVerification){
+          // setMode() limpia el aviso, así que el mensaje va DESPUÉS.
+          setMode("signin");
+          showAlert("Account created. We sent a confirmation link to " + email +
+                    " — open it and then sign in.", "success");
+          return;
+        }
+
         UI.showToast("Account created! Welcome to The Vendors Hub.", "success");
         const target = Auth.homeForRole(result.user.role);
         setTimeout(() => { window.location.replace(target); }, 600);
       } else {
         const result = await Auth.login({ email, password });
-        if(!result.ok){ showAlert(result.error); return; }
+        if(!result.ok){
+          showAlert(result.error, result.needsVerification ? "success" : "error");
+          return;
+        }
 
         UI.showToast(`Welcome back, ${result.user.email}`, "success");
         const target = Auth.homeForRole(result.user.role);
@@ -273,8 +292,49 @@
 
   /* Arranca la librería de Google y dibuja el botón oficial. El script de
      Google se carga con "async", así que puede no estar listo todavía. */
+  /* Con Firebase activo NO se usa la librería de Google Identity Services.
+     Firebase abre su propia ventana y, sobre todo, VERIFICA LA FIRMA del
+     token en el servidor. La versión anterior solo podía leer el contenido
+     del token y confiar en él, que es exactamente lo que no hay que hacer. */
+  function initGoogleFirebase(){
+    const section = document.getElementById("googleSection");
+    const host = document.getElementById("googleBtn");
+    if(!section || !host) return;
+
+    host.innerHTML =
+      `<button type="button" class="btn btn-secondary btn-block" id="fbGoogleBtn">
+         Continue with Google
+       </button>`;
+    section.style.display = "block";
+
+    document.getElementById("fbGoogleBtn").addEventListener("click", async () => {
+      clearAlert();
+      const btn = document.getElementById("fbGoogleBtn");
+      btn.disabled = true;
+      try{
+        const result = await Auth.signInWithGoogle({ role });
+        if(!result.ok && result.needsRole){
+          if(mode !== "register") setMode("register");
+          showAlert(result.error);
+          return;
+        }
+        if(!result.ok){ showAlert(result.error); return; }
+
+        UI.showToast(result.created
+          ? "Account created with Google! Welcome to The Vendors Hub."
+          : `Welcome back, ${result.user.email}`, "success");
+        setTimeout(() => { window.location.replace(Auth.homeForRole(result.user.role)); }, 600);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   function initGoogle(attempt){
     attempt = attempt || 0;
+    // Firebase activo → su propio flujo, y la librería de Google no se usa.
+    if(window.FB && FB.enabled){ initGoogleFirebase(); return; }
+
     const clientId = (window.APP_CONFIG && window.APP_CONFIG.GOOGLE_CLIENT_ID) || "";
     const section = document.getElementById("googleSection");
     if(!section) return;
@@ -311,4 +371,4 @@
 
   setMode(mode);
   if(role) setRole(role);
-})();
+});

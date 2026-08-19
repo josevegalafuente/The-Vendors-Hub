@@ -7,11 +7,16 @@
    adelante (sin 'unsafe-inline'), que es una de las defensas más efectivas
    contra la inyección de scripts.
    ========================================================================= */
-(function(){
+/* Espera a que la capa de datos esté lista antes de pintar. Con localStorage
+   la promesa ya viene resuelta y no cambia nada; con Firestore da tiempo a
+   cargar la sesión y el directorio. Si la carga falla, se pinta igual con lo
+   que haya en lugar de dejar la página en blanco. */
+DB.ready.catch(function(){}).then(function(){
+
   const user = DB.getCurrentUser();
   if(user && ["vendor", "pm", "admin"].indexOf(user.role) > -1){
     window.location.replace(Auth.homeForRole(user.role));
     return;
   }
   UI.mountChrome([], true);
-})();
+});

@@ -97,9 +97,29 @@
     db = FB.db;
     auth = FB.auth;
 
-    // Esperamos a saber si hay sesión antes de decidir qué se puede leer.
+    /* Esperamos a saber si hay sesión antes de decidir qué se puede leer.
+
+       ⚠️  El `off()` NO puede llamarse a secas dentro del callback: si
+       Firebase ya conoce el estado, lo invoca de inmediato y en ese momento
+       la constante todavía no está asignada. Eso lanzaba un ReferenceError
+       que Firebase se tragaba, la promesa no se resolvía nunca y la página
+       se quedaba esperando en blanco, sin ningún error visible.
+
+       Y un tiempo máximo: si Firebase no responde, es preferible seguir sin
+       sesión que dejar el sitio colgado. */
     const fbUser = await new Promise(resolve => {
-      const off = auth.onAuthStateChanged(u => { off(); resolve(u); });
+      let off = null, done = false;
+      const finish = u => {
+        if (done) return;
+        done = true;
+        if (typeof off === "function") off();
+        resolve(u);
+      };
+      off = auth.onAuthStateChanged(finish, err => {
+        console.error("[DB] onAuthStateChanged failed:", err);
+        finish(null);
+      });
+      setTimeout(() => finish(null), 10000);
     });
 
     if (fbUser) {

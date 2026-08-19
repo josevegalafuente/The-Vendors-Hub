@@ -12,7 +12,12 @@
      3) Ciudad   → "Ocala"                  → vendors que la cubren
      4) ZIP      → "34470"                  → vendors que atienden ese código
    ========================================================================= */
-(function(){
+/* Espera a que la capa de datos esté lista antes de pintar. Con localStorage
+   la promesa ya viene resuelta y no cambia nada; con Firestore da tiempo a
+   cargar la sesión y el directorio. Si la carga falla, se pinta igual con lo
+   que haya en lugar de dejar la página en blanco. */
+DB.ready.catch(function(){}).then(function(){
+
   const user = Auth.requireRole("pm", "auth.html?role=pm");
   if(!user) return;
 
@@ -273,4 +278,4 @@
   });
 
   render();
-})();
+});

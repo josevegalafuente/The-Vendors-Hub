@@ -16,13 +16,11 @@ window.APP_CONFIG = {
      El admin puede: ver el panel de administración, aprobar/rechazar
      solicitudes de cuenta, cambiar roles y dar de baja vendors.
 
-     ⚠️  Mientras el sitio no tenga backend, esta lista es una "puerta
-         blanda": alguien con conocimientos puede saltársela editando el
-         almacenamiento de su propio navegador. Eso NO le da acceso a los
-         datos de nadie más (cada navegador tiene sus propios datos), pero
-         la restricción sólo será real cuando pasemos a Firebase, donde
-         las reglas de seguridad se aplican en el servidor.
-         Ver: FIREBASE.md
+     ⚠️  Con Firebase activo, esta lista YA NO decide quién es admin de
+         verdad. El rol real vive en un "custom claim" del token, que solo
+         se escribe desde el servidor con tools/set-admin.js y que las
+         reglas de firestore.rules comprueban. Esta lista solo sirve para
+         eximir al admin de la regla de dominio al registrarse.
      ───────────────────────────────────────────────────────────────────── */
   ADMIN_EMAILS: [
     "jose.vega.lafuente@gmail.com"
@@ -81,18 +79,17 @@ window.APP_CONFIG = {
   },
 
   /* ─────────────────────────────────────────────────────────────────────
-     FIREBASE (Fase B) — todavía NO está activo.
-     Cuando crees el proyecto en console.firebase.google.com, copia aquí la
-     configuración web y pon ENABLED: true. La app detecta el cambio y usa
-     Firestore en lugar de localStorage. Estos valores son públicos por
-     diseño: la seguridad la dan las reglas de firestore.rules, no ocultar
-     la config. Guía completa en FIREBASE.md
+     FIREBASE — ACTIVO.
+     Las cuentas y el directorio viven en Firestore, no en el navegador. Por
+     eso una cuenta creada en un equipo funciona en cualquier otro: antes se
+     guardaban en localStorage y no salían de ese navegador.
+     Estos valores son públicos por diseño; la seguridad la dan las reglas de
+     firestore.rules, no ocultar la config. Guía completa en FIREBASE.md
      ───────────────────────────────────────────────────────────────────── */
   FIREBASE: {
-    // Ponlo en true SOLO cuando js/db-firebase.js esté listo y probado.
-    // Mientras esté en false, la app sigue usando localStorage y todo
-    // funciona igual: cambiar el interruptor es el último paso, no el primero.
-    ENABLED: false,
+    // Si se pone en false, la app vuelve a localStorage sin tocar nada más.
+    // Sirve como salida de emergencia si Firebase diera problemas.
+    ENABLED: true,
 
     apiKey:            "AIzaSyC47MYPTP0ImoYVeQskaZ1olxtBnQapTYQ",
     authDomain:        "the-vendors-hub.firebaseapp.com",

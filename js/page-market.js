@@ -2,7 +2,12 @@
    page-market.js — vista de un MERCADO con sus categorías y conteos reales.
    Sin números inventados: las categorías sin vendors salen desactivadas.
    ========================================================================= */
-(function(){
+/* Espera a que la capa de datos esté lista antes de pintar. Con localStorage
+   la promesa ya viene resuelta y no cambia nada; con Firestore da tiempo a
+   cargar la sesión y el directorio. Si la carga falla, se pinta igual con lo
+   que haya en lugar de dejar la página en blanco. */
+DB.ready.catch(function(){}).then(function(){
+
   const user = Auth.requireRole("pm", "auth.html?role=pm");
   if(!user) return;
 
@@ -98,4 +103,4 @@
     const href = `category.html?market=${encodeURIComponent(marketId)}&cat=${encodeURIComponent(cat.id)}`;
     return `<a class="cat-card" href="${href}">${inner}<span class="arrow-cta">→</span></a>`;
   }).join("");
-})();
+});

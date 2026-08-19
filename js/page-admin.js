@@ -10,7 +10,12 @@
        a Firebase, las reglas de firestore.rules harán que esto sea una
        restricción real de servidor. Ver FIREBASE.md
    ========================================================================= */
-(function(){
+/* Espera a que la capa de datos esté lista antes de pintar. Con localStorage
+   la promesa ya viene resuelta y no cambia nada; con Firestore da tiempo a
+   cargar la sesión y el directorio. Si la carga falla, se pinta igual con lo
+   que haya en lugar de dejar la página en blanco. */
+DB.ready.catch(function(){}).then(function(){
+
   const admin = Auth.requireAdmin();
   if(!admin) return;
 
@@ -419,4 +424,4 @@
          <code>data/vendors-contacts.local.js</code>, which is excluded from the repository so it never
          reaches the public site. Add that file locally to see contact emails here.`;
   }
-})();
+});
