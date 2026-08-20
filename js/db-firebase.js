@@ -137,12 +137,31 @@
 
       /* Las reglas exigen correo verificado para leer el directorio. Sin
          verificar, la sesión existe pero no hay datos que mostrar. */
+      /* Cada carga va por separado y tolera su propio fallo.
+
+         Antes iban encadenadas: si UNA fallaba, el arranque entero se caía,
+         la app volvía a la capa local —donde no hay sesión— y el usuario
+         acababa expulsado a la pantalla de registro segundos después de
+         entrar. Perder la sesión porque una consulta secundaria falle es
+         desproporcionado: es mejor entrar con parte de los datos y dejar el
+         motivo en la consola. */
       if (fbUser.emailVerified) {
-        const [listings, reviews] = await Promise.all([loadDirectory(), loadReviews()]);
-        mem.listings = listings;
-        mem.reviews = reviews;
-        mem.claimsList = await loadClaims(fbUser.uid);
-        if (mem.claims.role === "admin") mem.users = await loadUsers();
+        const safe = (label, p) => p.catch(err => {
+          console.error("[DB] Could not load " + label + ":", err);
+          return null;
+        });
+
+        const [listings, reviews, claimsList, users] = await Promise.all([
+          safe("the directory", loadDirectory()),
+          safe("reviews", loadReviews()),
+          safe("claims", loadClaims(fbUser.uid)),
+          mem.claims.role === "admin" ? safe("accounts", loadUsers()) : Promise.resolve(null)
+        ]);
+
+        if (listings)   mem.listings = listings;
+        if (reviews)    mem.reviews = reviews;
+        if (claimsList) mem.claimsList = claimsList;
+        if (users)      mem.users = users;
       }
     }
 

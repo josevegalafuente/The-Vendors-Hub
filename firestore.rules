@@ -126,8 +126,19 @@ service cloud.firestore {
 
     /* ─── claims (reclamaciones de ficha) ───────────────────────────── */
     match /claims/{claimId} {
-      allow get:  if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow list: if isAdmin();
+      /* `read` cubre get y list a la vez, y a propósito.
+
+         Antes eran dos reglas: `get` permitía ver la solicitud propia, pero
+         `list` exigía ser admin. Eso denegaba la consulta con la que un
+         vendor pide SUS PROPIAS solicitudes, y el fallo no se quedaba ahí:
+         tumbaba el arranque de la app, que caía de vuelta a localStorage
+         —donde no hay sesión— y expulsaba al usuario a la pantalla de
+         registro a los pocos segundos de haber entrado.
+
+         Con `read` sobre resource.data.userId, Firestore permite la consulta
+         siempre que esté filtrada por ese campo, que es justo la que hacemos,
+         y sigue denegando cualquier intento de listar las de otro. */
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
 
       /* Un vendor crea su solicitud, siempre en estado "pending". */
       allow create: if verified()
